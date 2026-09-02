@@ -1,0 +1,13 @@
+.venv/
+.venv312/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.streamlit/
+.env
+.env.*
+*.npz
+.DS_Store
+Thumbs.db
