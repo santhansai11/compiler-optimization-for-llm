@@ -5,10 +5,11 @@ import numpy as np
 from ir.graph import ComputationGraph
 
 
-def _add_transformer_block(graph, prefix, source, d_model):
-    """Append one post-LN transformer block; returns the block output node."""
+def _add_transformer_block(graph, prefix, source, d_model, act="gelu"):
+    """Append one post-LN transformer block; returns the block output."""
     p = prefix
     scale_factor = float(1.0 / np.sqrt(d_model))
+    act_op = "GELU" if act == "gelu" else "Relu"
 
     graph.add_operation(f"{p}_Q_Projection", "MatMul")
     graph.add_operation(f"{p}_K_Projection", "MatMul")
@@ -21,7 +22,7 @@ def _add_transformer_block(graph, prefix, source, d_model):
     graph.add_operation(f"{p}_LayerNorm", "LayerNorm")
     graph.add_operation(f"{p}_FFN_Linear", "MatMul")
     graph.add_operation(f"{p}_FFN_Bias", "Add")
-    graph.add_operation(f"{p}_GELU", "GELU")
+    graph.add_operation(f"{p}_GELU", act_op)
     graph.add_operation(f"{p}_FFN_Output", "MatMul")
     graph.add_operation(f"{p}_FFN_Bias_Output", "Add")
     graph.add_operation(f"{p}_FFN_Residual_Add", "Add")
@@ -57,7 +58,8 @@ def _add_transformer_block(graph, prefix, source, d_model):
     return f"{p}_Dropout"
 
 
-def create_demo_transformer_graph(num_blocks=2, batch=4, seq=32, d_model=64):
+def create_demo_transformer_graph(num_blocks=2, batch=4, seq=32,
+                                  d_model=64, act="gelu"):
     """Build a small transformer computation graph for demo purposes."""
     graph = ComputationGraph("demo_transformer")
     graph.meta["config"] = {"batch": batch, "seq": seq, "d_model": d_model}
@@ -85,7 +87,8 @@ def create_demo_transformer_graph(num_blocks=2, batch=4, seq=32, d_model=64):
 
     node = "Embed_Add"
     for index in range(1, num_blocks + 1):
-        node = _add_transformer_block(graph, f"Block{index}", node, d_model)
+        node = _add_transformer_block(graph, f"Block{index}", node,
+                                      d_model, act=act)
 
     graph.add_operation("Logits", "MatMul")
     graph.add_dependency(node, "Logits")

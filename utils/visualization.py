@@ -17,6 +17,8 @@ OP_COLORS = {
     "Softmax": "#ffadad",
     "LayerNorm": "#c7ceea",
     "GELU": "#ffc9de",
+    "Relu": "#c8f7dc",
+    "LinearRelu": "#b9f0ff",
     "Operation": "#cfe2ff",
 }
 

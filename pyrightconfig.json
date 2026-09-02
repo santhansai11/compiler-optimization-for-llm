@@ -1,0 +1,16 @@
+{
+  "include": ["."],
+  "exclude": [".venv", ".venv312", "__pycache__", "**/__pycache__"],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.12"
+    }
+  ],
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportGeneralTypeIssues": "none"
+}

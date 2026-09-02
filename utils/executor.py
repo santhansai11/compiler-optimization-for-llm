@@ -13,7 +13,7 @@ import zlib
 
 import numpy as np
 
-EXEC_CONFIG = {"batch": 4, "seq": 32, "d_model": 64}
+DEFAULT_CONFIG = {"batch": 4, "seq": 32, "d_model": 64}
 
 # Weights are constants of the model: generate once, reuse across runs so
 # timed executions measure compute rather than RNG noise.
@@ -60,21 +60,25 @@ def _gelu(x):
     ).astype(np.float32)
 
 
-def execute(graph, repeats=30, warmup=2):
+def execute(graph, repeats=30, warmup=2, feed=None):
     """Run the graph; return outputs, best-case latency and peak memory.
 
     Latency is the minimum over ``repeats`` timed runs (the timeit-style
     steady-state estimator — least contaminated by OS scheduling noise).
+    ``feed`` overrides the synthetic input (e.g. real dataset samples).
     """
-    config = dict(EXEC_CONFIG)
+    config = dict(DEFAULT_CONFIG)
     config.update(graph.meta.get("config") or {})
-    batch, seq, d_model = (
-        int(config["batch"]),
-        int(config["seq"]),
-        int(config["d_model"]),
-    )
-    rng = np.random.default_rng(0)
-    feed = rng.standard_normal((batch, seq, d_model)).astype(np.float32)
+    batch = int(config["batch"])
+    input_shape = list(config.get("input_shape") or
+                       [int(config["seq"]), int(config["d_model"])])
+    if feed is None:
+        rng = np.random.default_rng(0)
+        feed = rng.standard_normal([batch] + input_shape).astype(
+            np.float32
+        )
+    else:
+        feed = np.asarray(feed, dtype=np.float32)
 
     def run_once(track_memory):
         cache = {}
@@ -135,6 +139,7 @@ def execute(graph, repeats=30, warmup=2):
 def _compute(name, data, ins, feed):
     op = data.get("op_type", "Operation")
     base = (data.get("fused_from") or [name])[0]
+    weight = data.get("weight")
 
     if op == "Input":
         return feed
@@ -148,6 +153,8 @@ def _compute(name, data, ins, feed):
     if op == "Scale":
         factor = np.float32(float(data.get("factor", 1.0)))
         return (ins[0] * factor).astype(np.float32)
+    if op == "Relu":
+        return np.maximum(ins[0], np.float32(0.0)).astype(np.float32)
     if op == "Add":
         out = ins[0]
         for value in ins[1:]:
@@ -167,11 +174,17 @@ def _compute(name, data, ins, feed):
     if op == "GELU":
         return _gelu(ins[0])
     if op == "MatMul":
-        return _matmul(ins, base)
+        return _matmul(ins, base, weight)
     if op == "GEMM":
-        return (_matmul(ins[:1], base) + _bias(data, ins)).astype(np.float32)
+        return (_matmul(ins[:1], base, weight)
+                + _bias(data, ins)).astype(np.float32)
     if op == "LinearGELU":
-        return _gelu(_matmul(ins[:1], base) + _bias(data, ins))
+        return _gelu(_matmul(ins[:1], base, weight) + _bias(data, ins))
+    if op == "LinearRelu":
+        return np.maximum(
+            _matmul(ins[:1], base, weight) + _bias(data, ins),
+            np.float32(0.0),
+        ).astype(np.float32)
     if op == "FusedAddLayerNorm":
         total = ins[0]
         for value in ins[1:]:
@@ -192,16 +205,22 @@ def _bias(data, ins):
     return np.float32(0.0)
 
 
-def _matmul(ins, base):
+def _matmul(ins, base, weight=None):
     """MatMul with orientation resolution.
 
-    Single input -> x @ W (square weight seeded from ``base``). Two inputs
-    -> the unique shape-valid product; equal-shaped 3-D operands with no
-    plain interpretation fall back to the Q @ K^T convention.
+    Single input -> x @ W, where ``W`` is the node's stored ``weight``
+    attribute (trained models) or the deterministic seeded matrix.
+    Two inputs -> the unique shape-valid product; equal-shaped 3-D
+    operands with no plain interpretation fall back to the Q @ K^T
+    convention.
     """
     if len(ins) == 1:
         x = ins[0]
-        return (x @ _weight(base + "::w", x.shape[-1])).astype(np.float32)
+        if weight is None:
+            W = _weight(base + "::w", x.shape[-1])
+        else:
+            W = np.asarray(weight, dtype=np.float32)
+        return (x @ W).astype(np.float32)
     a, b = ins[0], ins[1]
     if a.ndim >= 2 and b.ndim >= 2:
         if a.shape[-1] == b.shape[-2]:

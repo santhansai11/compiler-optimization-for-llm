@@ -1,20 +1,30 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 cd /d "%~dp0"
 
 set "PATH=C:\Program Files\Graphviz\bin;%PATH%"
+set "VENV=.venv312"
+set "PY=%VENV%\Scripts\python.exe"
+set "ST=%VENV%\Scripts\streamlit.exe"
 
-if exist ".venv312\Scripts\streamlit.exe" (
-  ".venv312\Scripts\streamlit.exe" run app.py --server.port 8501
-  goto :eof
+if not exist "%PY%" (
+  echo Creating Python 3.12 virtualenv...
+  py -3.12 -m venv "%VENV%"
+  if errorlevel 1 (
+    echo Failed to create venv. Install Python 3.12 and the "py" launcher.
+    exit /b 1
+  )
 )
 
-if exist ".venv\Scripts\streamlit.exe" (
-  ".venv\Scripts\streamlit.exe" run app.py --server.port 8501
-  goto :eof
+if not exist "%ST%" (
+  echo Installing dependencies from requirements.txt...
+  "%PY%" -m pip install --upgrade pip
+  "%PY%" -m pip install -r requirements.txt
+  if errorlevel 1 (
+    echo pip install failed.
+    exit /b 1
+  )
 )
 
-echo No virtualenv found. Create one with:
-echo   py -3.12 -m venv .venv312
-echo   .venv312\Scripts\python.exe -m pip install streamlit networkx graphviz numpy
-exit /b 1
+echo Starting LLM Compiler Optimizer at http://localhost:8501
+"%ST%" run app.py --server.port 8501

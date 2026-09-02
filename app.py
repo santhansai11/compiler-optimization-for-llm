@@ -174,6 +174,17 @@ rl_search = st.sidebar.checkbox(
 )
 
 st.sidebar.divider()
+st.sidebar.subheader("🏋️ Dataset & Training")
+train_on_dataset = st.sidebar.checkbox(
+    "Train MLP on MNIST + compile it",
+    value=False,
+    help="Train a small classifier on the MNIST dataset (NumPy, manual "
+         "backprop), export the trained weights into the IR and compile "
+         "them. Cached after the first run: the first run trains (~1 "
+         "min), later runs load the cached model.",
+)
+
+st.sidebar.divider()
 st.sidebar.subheader("🧠 Input Model")
 model_name = st.sidebar.selectbox(
     "Model",
@@ -220,6 +231,16 @@ if run_clicked:
     except Exception:
         gnn_score = None
 
+    training_outcome = None
+    if train_on_dataset:
+        from training.train import run_training
+
+        with st.spinner("Training on MNIST (cached after the first run)…"):
+            try:
+                training_outcome = run_training()
+            except Exception as exc:
+                st.error(f"Training failed: {exc}")
+
     with st.spinner("Compiling and evaluating…"):
         optimized_graph, infos, compile_time = run_pipeline(
             original_graph,
@@ -237,6 +258,7 @@ if run_clicked:
             "optimized": optimized_graph,
             "rl_info": rl_info,
             "gnn_score": gnn_score,
+            "training": training_outcome,
         }
 
 result = st.session_state.get("result")
@@ -510,9 +532,9 @@ with g2:
     )
 
 # --------------------------------------------------------------------- tabs
-tab_details, tab_sched, tab_part, tab_learn, tab_report = st.tabs(
+tab_details, tab_sched, tab_part, tab_learn, tab_train, tab_report = st.tabs(
     ["🧾 Pass Details", "🗓️ DAGS Schedule", "🧱 Partitions",
-     "🧠 Learned Search", "📋 Full Report"]
+     "🧠 Learned Search", "🏋️ Training (MNIST)", "📋 Full Report"]
 )
 
 with tab_details:
@@ -611,6 +633,49 @@ with tab_learn:
             "Enable the learned-search toggles in the sidebar to see the "
             "GNN prediction, the RL pass-order recommendation and the "
             "neuro-symbolic rewrite log."
+        )
+
+with tab_train:
+    training_outcome = result.get("training")
+    if training_outcome:
+        data = training_outcome["dataset"]
+        tm = training_outcome["metrics"]
+        st.markdown(_card(
+            "MNIST Test Accuracy",
+            f"{training_outcome['test_acc'] * 100:.2f}<small> %</small>",
+            sub=f"dataset: {data['name']} · MLP 784-256-64-10 · "
+                "NumPy manual backprop + Adam",
+            chip=f"{len(data['x_train'])} train / {len(data['x_test'])} test",
+            chip_kind="good",
+            icon="🏋️",
+        ), unsafe_allow_html=True)
+        st.caption(
+            "The trained weights were exported into the IR "
+            f"({training_outcome['graph'].node_count()} ops), compiled to "
+            f"{training_outcome['optimized'].node_count()} ops "
+            f"({tm['modeled']['speedup']:.2f}× modeled, "
+            f"{tm['speedup']:.2f}× measured) and verified: "
+            f"{training_outcome['pred_match_pct']:.1f}% identical "
+            "predictions vs the trained model (bit-exact)."
+        )
+        history_df = pd.DataFrame(training_outcome["history"])
+        st.subheader("Cross-entropy loss")
+        st.line_chart(history_df.set_index("epoch")[["train_loss",
+                                                     "val_loss"]],
+                      height=240)
+        st.subheader("Accuracy")
+        st.line_chart(history_df.set_index("epoch")[["train_acc",
+                                                     "val_acc"]],
+                      height=240)
+        st.subheader("Confusion matrix (test split)")
+        cm_df = pd.DataFrame(training_outcome["confusion"])
+        st.dataframe(cm_df, use_container_width=True)
+    else:
+        st.caption(
+            "Enable **Train MLP on MNIST + compile it** in the sidebar, "
+            "then click Run Optimization — the first run trains the model "
+            "(cached afterwards) and this tab shows the training curves, "
+            "the confusion matrix and the compiled-model verification."
         )
 
 with tab_report:

@@ -445,6 +445,219 @@ def fig6_metrics(m):
     save(img, W, H, "fig6_metrics.png")
 
 
+def polyline(draw, points, color, width=3):
+    pts = [(x * SS, y * SS) for x, y in points]
+    draw.line(pts, fill=color, width=width * SS, joint="curve")
+    for x, y in pts:
+        draw.ellipse([x - 4 * SS, y - 4 * SS, x + 4 * SS, y + 4 * SS],
+                     fill=color)
+
+
+def fig7_compile(infos):
+    """Per-pass compilation time breakdown."""
+    W, H = 1250, 520
+    img, draw = new_canvas(W, H)
+    title_block(draw, W, "Compilation time breakdown",
+                "Wall time of each pass (metric 10) — the whole pipeline "
+                "runs in a few milliseconds")
+    rows = [(name, info.get("duration_s", 0.0) * 1e3)
+            for name, info in infos.items()
+            if isinstance(info, dict) and "duration_s" in info
+            and name != "pipeline"]
+    rows.sort(key=lambda item: item[1])
+    mx = max(v for _, v in rows) or 1.0
+    x0, y = 330, 150
+    for name, ms in rows:
+        bw = max(6, (ms / mx) * 700)
+        draw.rounded_rectangle([x0 * SS, y * SS, (x0 + bw) * SS,
+                                (y + 30) * SS], radius=8 * SS, fill=INDIGO)
+        draw.text(((x0 - 14) * SS, (y + 15) * SS), name, fill=SLATE,
+                  font=font(13, bold=True), anchor="rm")
+        draw.text(((x0 + bw + 12) * SS, (y + 15) * SS),
+                  f"{ms:.2f} ms", fill=SLATE, font=font(13), anchor="lm")
+        y += 52
+    save(img, W, H, "fig7_compile_time.png")
+
+
+def fig8_structural(m):
+    """The four structural ratio metrics."""
+    W, H = 1250, 520
+    img, draw = new_canvas(W, H)
+    title_block(draw, W, "Structural optimization ratios",
+                "Exact counts from the IR (GRR / OMR / ACR / kernel-launch "
+                "reduction)")
+    rows = [
+        ("Graph Reduction Ratio (GRR)", m["graph_reduction_ratio"]),
+        ("Operator Merge Ratio (OMR)", m["operator_merge_ratio"]),
+        ("Attention Canonicalization (ACR)",
+         m["attention_canonicalization_rate"]),
+        ("Kernel Launch Reduction", m["kernel_launch_reduction"]),
+    ]
+    x0, y = 380, 150
+    for name, value in rows:
+        bw = max(8, value * 700)
+        color = GREEN_FG if value >= 0.5 else INDIGO
+        draw.rounded_rectangle([x0 * SS, y * SS, (x0 + bw) * SS,
+                                (y + 34) * SS], radius=8 * SS, fill=color)
+        draw.text(((x0 - 14) * SS, (y + 17) * SS), name, fill=SLATE,
+                  font=font(13, bold=True), anchor="rm")
+        draw.text(((x0 + bw + 12) * SS, (y + 17) * SS),
+                  f"{value * 100:.1f}%", fill=SLATE,
+                  font=font(14, bold=True), anchor="lm")
+        y += 68
+    save(img, W, H, "fig8_structural.png")
+
+
+def _axes(draw, x0, x1, y0, y1, epochs, lo, hi, y_fmt):
+    draw.line([x0 * SS, y0 * SS, x1 * SS, y0 * SS], fill=SLATE,
+              width=2 * SS)
+    draw.line([x0 * SS, y0 * SS, x0 * SS, y1 * SS], fill=SLATE,
+              width=2 * SS)
+    for e in range(1, int(epochs) + 1):
+        px = x0 + (e - 1) / max(1, epochs - 1) * (x1 - x0)
+        draw.text((px * SS, (y0 + 16) * SS), str(e), fill=GRAY,
+                  font=font(12), anchor="mm")
+    for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+        vy = lo + frac * (hi - lo)
+        py = y0 - frac * (y0 - y1)
+        draw.text(((x0 - 12) * SS, py * SS), y_fmt.format(vy), fill=GRAY,
+                  font=font(12), anchor="rm")
+    draw.text((((x0 + x1) / 2) * SS, (y0 + 42) * SS), "epoch", fill=SLATE,
+              font=font(13, bold=True), anchor="mm")
+
+
+def fig9_train_loss(history):
+    W, H = 1200, 640
+    img, draw = new_canvas(W, H)
+    title_block(draw, W, "Training on MNIST — cross-entropy loss",
+                "NumPy MLP 784→256→64→10 · manual backprop + Adam · "
+                "mini-batch 64")
+    epochs = history["epoch"][-1]
+    tl, vl = history["train_loss"], history["val_loss"]
+    lo, hi = 0.0, max(max(tl), max(vl)) * 1.15
+    x0, x1, y0, y1 = 170, 1080, 170, 520
+
+    def px(e):
+        return x0 + (e - 1) / max(1, epochs - 1) * (x1 - x0)
+
+    def py(v):
+        return y0 - (v - lo) / (hi - lo) * (y0 - y1)
+
+    _axes(draw, x0, x1, y0, y1, epochs, lo, hi, "{:.2f}")
+    polyline(draw, [(px(e), py(v)) for e, v in zip(history["epoch"], tl)],
+             INDIGO)
+    polyline(draw, [(px(e), py(v)) for e, v in zip(history["epoch"], vl)],
+             PURPLE)
+    draw.text((120 * SS, 600 * SS),
+              "both losses fall and stay close together → learning without "
+              "overfitting", fill=SLATE, font=font(13))
+    chip(draw, 900, 190, "train loss", "#FFFFFF", INDIGO)
+    chip(draw, 900, 235, "validation loss", "#FFFFFF", PURPLE)
+    save(img, W, H, "fig9_train_loss.png")
+
+
+def fig10_train_accuracy(history):
+    W, H = 1200, 640
+    img, draw = new_canvas(W, H)
+    title_block(draw, W, "Training on MNIST — accuracy",
+                "train vs validation accuracy per epoch")
+    epochs = history["epoch"][-1]
+    ta, va = history["train_acc"], history["val_acc"]
+    lo = min(min(ta), min(va)) - 0.02
+    hi = 1.0
+    x0, x1, y0, y1 = 170, 1080, 170, 520
+
+    def px(e):
+        return x0 + (e - 1) / max(1, epochs - 1) * (x1 - x0)
+
+    def py(v):
+        return y0 - (v - lo) / (hi - lo) * (y0 - y1)
+
+    _axes(draw, x0, x1, y0, y1, epochs, lo, hi, "{:.2f}")
+    polyline(draw, [(px(e), py(v)) for e, v in zip(history["epoch"], ta)],
+             INDIGO)
+    polyline(draw, [(px(e), py(v)) for e, v in zip(history["epoch"], va)],
+             PURPLE)
+    last = history["val_acc"][-1]
+    draw.text((120 * SS, 600 * SS),
+              f"final validation accuracy: {last * 100:.2f}% (metric for "
+              "the trained model)", fill=SLATE, font=font(13, bold=True))
+    chip(draw, 900, 190, "train acc", "#FFFFFF", INDIGO)
+    chip(draw, 900, 235, "validation acc", "#FFFFFF", PURPLE)
+    save(img, W, H, "fig10_train_accuracy.png")
+
+
+def fig11_confusion(cm):
+    W, H = 1120, 950
+    img, draw = new_canvas(W, H)
+    title_block(draw, W, "Confusion matrix on the MNIST test split",
+                "rows = true digit, columns = predicted digit "
+                "(diagonal = correct)")
+    cell, ox, oy = 78, 170, 170
+    mx = max(int(cm.max()), 1)
+    for i in range(10):
+        for j in range(10):
+            v = int(cm[i, j])
+            t = v / mx
+            col = tuple(int(255 - (255 - c) * t) for c in INDIGO)
+            x = ox + j * cell
+            y = oy + i * cell
+            draw.rectangle([x * SS, y * SS, (x + cell) * SS,
+                            (y + cell) * SS], fill=col, outline=BORDER,
+                           width=SS)
+            if v:
+                draw.text(((x + cell / 2) * SS, (y + cell / 2) * SS),
+                          str(v), fill=WHITE if t > 0.45 else SLATE,
+                          font=font(11), anchor="mm")
+        draw.text(((ox - 14) * SS, (oy + i * cell + cell / 2) * SS),
+                  str(i), fill=SLATE, font=font(13, bold=True), anchor="rm")
+        draw.text(((ox + i * cell + cell / 2) * SS, (oy - 14) * SS),
+                  str(i), fill=SLATE, font=font(13, bold=True), anchor="mb")
+    draw.text((60 * SS, (oy + 5 * cell) * SS), "true digit", fill=GRAY,
+              font=font(13, bold=True))
+    draw.text(((ox + 5 * cell) * SS, (oy - 48) * SS), "predicted digit",
+              fill=GRAY, font=font(13, bold=True), anchor="mm")
+    diag = sum(int(cm[i, i]) for i in range(10)) / max(1, int(cm.sum()))
+    draw.text((60 * SS, 880 * SS),
+              f"diagonal share (accuracy): {diag * 100:.2f}%",
+              fill=SLATE, font=font(14, bold=True))
+    save(img, W, H, "fig11_confusion.png")
+
+
+def fig12_architectures(rows):
+    """rows: (name, ops_before, ops_after, modeled_speedup)."""
+    W, H = 1500, 660
+    img, draw = new_canvas(W, H)
+    title_block(draw, W, "Architecture comparison — same compiler, "
+                         "same metrics",
+                "ops before/after the pipeline + modeled speedup per "
+                "architecture")
+    bw, gap = 260, 70
+    mx = max(r[1] for r in rows)
+    base_y, chart_h = 450, 270
+    for i, (name, before, after, spd) in enumerate(rows):
+        cx = 190 + i * (bw + gap)
+        for j, (val, col, tag) in enumerate(
+            ((before, (150, 160, 175), "original"),
+             (after, INDIGO, "optimized"))
+        ):
+            h = max(8, int(chart_h * val / mx))
+            bx = cx - 65 + j * 135
+            draw.rounded_rectangle(
+                [bx * SS, (base_y - h) * SS, (bx + 110) * SS,
+                 base_y * SS], radius=8 * SS, fill=col)
+            draw.text(((bx + 55) * SS, (base_y - h - 18) * SS), str(val),
+                      fill=SLATE, font=font(16, bold=True), anchor="mm")
+            draw.text(((bx + 55) * SS, (base_y + 16) * SS), tag,
+                      fill=GRAY, font=font(11), anchor="mm")
+        draw.text((cx * SS, (base_y + 44) * SS), name, fill=SLATE,
+                  font=font(13, bold=True), anchor="mm")
+        draw.text((cx * SS, (base_y + 66) * SS),
+                  f"{spd:.2f}× modeled speedup", fill=GREEN_FG,
+                  font=font(12, bold=True), anchor="mm")
+    save(img, W, H, "fig12_architectures.png")
+
+
 def main():
     from models.transformer import create_demo_transformer_graph
     from pipeline import run_pipeline
@@ -461,6 +674,30 @@ def main():
     from utils.metrics import compute_metrics
     metrics = compute_metrics(graph, optimized, infos, compile_time)
     fig6_metrics(metrics)
+    fig7_compile(infos)
+    fig8_structural(metrics)
+
+    try:
+        from training.train import run_training
+
+        outcome = run_training()
+        fig9_train_loss(outcome["history"])
+        fig10_train_accuracy(outcome["history"])
+        fig11_confusion(outcome["confusion"])
+    except Exception as exc:
+        print("training figures skipped:", exc)
+
+    rows = []
+    from models.architectures import ARCHITECTURES
+
+    for name, builder in ARCHITECTURES.items():
+        arch_graph = builder()
+        arch_opt, arch_infos, arch_time = run_pipeline(arch_graph)
+        arch_metrics = compute_metrics(arch_graph, arch_opt, arch_infos,
+                                       arch_time)
+        rows.append((name, arch_graph.node_count(), arch_opt.node_count(),
+                     arch_metrics["modeled"]["speedup"]))
+    fig12_architectures(rows)
     print("all figures generated")
 
 

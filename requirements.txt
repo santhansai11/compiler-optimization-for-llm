@@ -3,3 +3,4 @@ networkx>=3.2
 graphviz>=0.20
 numpy>=1.26
 pillow>=10.0
+pandas>=2.0

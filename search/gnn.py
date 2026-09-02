@@ -17,8 +17,9 @@ from utils.cost_model import get_op_latency
 
 OP_VOCAB = [
     "Input", "Constant", "Identity", "MatMul", "GEMM", "LinearGELU",
-    "FusedAttention", "FusedAddLayerNorm", "FusedScaleSoftmax", "Scale",
-    "Softmax", "Add", "Mul", "Sub", "LayerNorm", "GELU", "Operation",
+    "LinearRelu", "FusedAttention", "FusedAddLayerNorm",
+    "FusedScaleSoftmax", "Scale", "Softmax", "Add", "Mul", "Sub",
+    "LayerNorm", "GELU", "Relu", "Operation",
 ]
 
 FEATURE_EXTRA = 4

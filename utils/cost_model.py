@@ -25,6 +25,8 @@ OP_LATENCY_US = {
     "Sub": 70.0,
     "LayerNorm": 160.0,
     "GELU": 130.0,
+    "Relu": 45.0,
+    "LinearRelu": 940.0,
     "Identity": 20.0,
 }
 
@@ -44,6 +46,8 @@ OP_MEMORY_MB = {
     "Sub": 24.0,
     "LayerNorm": 40.0,
     "GELU": 32.0,
+    "Relu": 16.0,
+    "LinearRelu": 115.0,
     "Identity": 16.0,
 }
 

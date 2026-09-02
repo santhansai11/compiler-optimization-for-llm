@@ -24,8 +24,10 @@ OP_TYPE_MAP = {
     "softmax": "Softmax",
     "layernorm": "LayerNorm",
     "gelu": "GELU",
+    "relu": "Relu",
     "identity": "Identity",
     "lineargelu": "LinearGELU",
+    "linearrelu": "LinearRelu",
     "fusedaddlayernorm": "FusedAddLayerNorm",
     "fusedscalesoftmax": "FusedScaleSoftmax",
     "fusedattention": "FusedAttention",
@@ -36,10 +38,11 @@ COMMUTATIVE_OPS = {"Add", "Mul"}
 # Ops carrying implicit parameters (e.g. MatMul weight matrices) that the
 # (op_type, inputs) signature cannot capture must never be CSE'd - Q/K/V
 # projections share inputs but must stay distinct.
-PARAMETERIZED_OPS = {"MatMul", "GEMM", "LinearGELU", "FusedAttention"}
+PARAMETERIZED_OPS = {"MatMul", "GEMM", "LinearGELU", "LinearRelu",
+                     "FusedAttention"}
 ELEMENTWISE_OPS = {
     "Add", "Mul", "Sub", "Scale", "Softmax", "LayerNorm", "GELU",
-    "Identity", "FusedAddLayerNorm", "FusedScaleSoftmax",
+    "Relu", "Identity", "FusedAddLayerNorm", "FusedScaleSoftmax",
 }
 
 
@@ -255,12 +258,14 @@ def _infer_shapes(graph):
         shape = None
 
         if op_type == "Input":
-            shape = (batch, seq, d_model)
+            shape = tuple(
+                [batch] + list(config.get("input_shape") or [seq, d_model])
+            )
         elif op_type == "Constant":
             value = data.get("value")
             if value is not None:
                 shape = tuple(value.shape)
-        elif op_type in ("MatMul", "GEMM", "LinearGELU"):
+        elif op_type in ("MatMul", "GEMM", "LinearGELU", "LinearRelu"):
             if shapes and all(s is not None for s in shapes):
                 shape = _matmul_output_shape(shapes)
         elif op_type == "FusedAttention":

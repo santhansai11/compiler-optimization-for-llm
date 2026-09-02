@@ -8,6 +8,8 @@ FUSION_PATTERNS = {
     ("MatMul", "Add"): "GEMM",
     ("GEMM", "GELU"): "LinearGELU",
     ("MatMul", "GELU"): "LinearGELU",
+    ("GEMM", "Relu"): "LinearRelu",
+    ("MatMul", "Relu"): "LinearRelu",
     ("Add", "LayerNorm"): "FusedAddLayerNorm",
     ("Scale", "Softmax"): "FusedScaleSoftmax",
 }
