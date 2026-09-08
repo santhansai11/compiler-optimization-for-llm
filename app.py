@@ -17,62 +17,277 @@ st.set_page_config(
 
 CUSTOM_CSS = """
 <style>
-    .block-container { padding-top: 1.4rem; padding-bottom: 2.4rem; }
+    /* ---- hide sidebar & chrome ---- */
+    [data-testid="stSidebar"]        { display: none !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
+    .block-container {
+        padding-top: 4.5rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 100% !important;
+        padding-left: 3rem !important;
+        padding-right: 3rem !important;
+    }
     #MainMenu, footer { visibility: hidden; }
-    .app-title { font-size: 2rem; font-weight: 800; color: #101828;
-                 letter-spacing: -0.02em; margin: 0; }
-    .app-sub { color: #667085; font-size: .93rem; margin-top: 4px; }
+
+    /* ---- DARK BASE ---- */
+    .stApp,
+    section[data-testid="stMain"],
+    div[data-testid="stAppViewContainer"] { background-color: #0a0a0a !important; }
+    .stApp > header { background: #0a0a0a !important;
+                      border-bottom: 1px solid rgba(255,255,255,.07) !important; }
+
+    /* ---- NAV ROW wrapper — flex: logo | spacer | nav items | run ---- */
+    .nav-cols-row {
+        background: #080808 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        padding: 0 24px;
+        margin-bottom: 0 !important;
+    }
+    .nav-cols-row > div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        align-items: center !important;
+        min-height: 52px !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    /* 1) Logo column */
+    .nav-cols-row > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(1) {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    /* 2) Spacer column */
+    .nav-cols-row > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(2) {
+        flex: 1 1 auto !important;
+        width: auto !important;
+    }
+    /* 3+) Nav items and Run */
+    .nav-cols-row > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(n+3) {
+        flex: 0 0 max-content !important;
+        width: max-content !important;
+        min-width: max-content !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 8px !important;
+    }
+
+    /* ---- Logo ---- */
+    .nav-logo-md {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+    .nav-logo-md svg {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+    }
+    .nav-logo-md .logo-text {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -.02em;
+        white-space: nowrap;
+    }
+
+    /* ---- Popover nav buttons — Linear style: plain text, no borders ---- */
+    div[data-testid="stPopover"] button {
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        border-radius: 6px !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        color: #9ca3af !important;
+        padding: 5px 12px !important;
+        height: auto !important;
+        width: max-content !important;
+        min-width: max-content !important;
+        white-space: nowrap !important;
+        transition: color 150ms ease, background-color 150ms ease !important;
+    }
+    div[data-testid="stPopover"] button p {
+        color: #9ca3af !important;
+        font-weight: 500 !important;
+        font-size: 0.85rem !important;
+        margin: 0 !important;
+    }
+    /* Hover and Open (Active) state: subtle background and white text */
+    div[data-testid="stPopover"] button:hover,
+    div[data-testid="stPopover"] button[aria-expanded="true"] {
+        color: #ffffff !important;
+        background: rgba(255,255,255,0.08) !important;
+        background-color: rgba(255,255,255,0.08) !important;
+    }
+    div[data-testid="stPopover"] button:hover p,
+    div[data-testid="stPopover"] button[aria-expanded="true"] p {
+        color: #ffffff !important;
+    }
+    div[data-testid="stPopover"] button:focus,
+    div[data-testid="stPopover"] button:active {
+        outline: none !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* ---- Run — SOLID white pill like Linear "Sign up" ---- */
+    div[data-testid="stButton"] button[kind="primary"] {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: none !important;
+        border-radius: 999px !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        padding: 5px 16px !important;
+        box-shadow: none !important;
+        height: auto !important;
+        transition: background 120ms ease !important;
+    }
+    div[data-testid="stButton"] button[kind="primary"] p {
+        color: #000000 !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        margin: 0 !important;
+    }
+    div[data-testid="stButton"] button[kind="primary"]:hover {
+        background: #e5e7eb !important;
+        background-color: #e5e7eb !important;
+        color: #000000 !important;
+    }
+
+    /* ---- Global text on dark ---- */
+    p, span, label, li { color: #d1d5db !important; }
+    h1, h2, h3, h4, h5, h6 { color: #f3f4f6 !important; }
+    .stAlert, [data-testid="stAlert"] {
+        background: rgba(255,255,255,.05) !important;
+        border: 1px solid rgba(255,255,255,.1) !important;
+        border-radius: 12px !important;
+    }
+    [data-testid="stAlert"] p { color: #c9d1d9 !important; }
+    hr { border-color: rgba(255,255,255,.08) !important; }
+
+    /* ---- Section title ---- */
     .section-title {
-        font-size: 1.02rem; font-weight: 700; color: #101828;
-        border-left: 4px solid #4f46e5; padding-left: 10px;
+        font-size: 1.02rem; font-weight: 700; color: #f0f0f0;
+        border-left: 4px solid #6366f1; padding-left: 10px;
         margin: 10px 0 2px 0;
     }
+
+    /* ---- Hero banner ---- */
     .hero {
-        background: linear-gradient(120deg, #4f46e5 0%, #7c3aed 55%, #a855f7 100%);
-        border-radius: 20px; padding: 20px 26px; color: #ffffff;
+        background: linear-gradient(120deg, #3730a3 0%, #6d28d9 55%, #9333ea 100%);
+        border-radius: 20px; padding: 20px 26px; color: #fff;
         display: flex; justify-content: space-between; align-items: center;
         flex-wrap: wrap; gap: 14px;
-        box-shadow: 0 10px 30px rgba(79, 70, 229, .32);
+        box-shadow: 0 10px 40px rgba(79,70,229,.35);
     }
-    .hero-kicker { font-size: .74rem; font-weight: 700; letter-spacing: .14em;
-                   text-transform: uppercase; opacity: .85; }
-    .hero-big { font-size: 2.7rem; font-weight: 800; line-height: 1.05; }
-    .hero-sub { font-size: .9rem; opacity: .92; margin-top: 2px; }
-    .hero-chips { display: flex; gap: 8px; flex-wrap: wrap;
-                  justify-content: flex-end; max-width: 460px; }
-    .hchip { background: rgba(255,255,255,.16);
-             border: 1px solid rgba(255,255,255,.35);
-             padding: 6px 12px; border-radius: 999px;
-             font-size: .8rem; font-weight: 600; }
+    .hero-kicker { font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .8; color:#fff !important; }
+    .hero-big    { font-size: 2.7rem; font-weight: 800; line-height: 1.05; color: #fff !important; }
+    .hero-sub    { font-size: .9rem; opacity: .85; margin-top: 2px; color: #fff !important; }
+    .hero-chips  { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 460px; }
+    .hchip { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+             padding: 6px 12px; border-radius: 999px; font-size: .8rem; font-weight: 600; color: #fff !important; }
+
+    /* ---- Metric cards ---- */
     .mcard {
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid #e5eaf1; border-radius: 16px;
-        padding: 14px 16px 12px 16px; height: 100%;
-        box-shadow: 0 1px 2px rgba(16,24,40,.05),
-                    0 1px 3px rgba(16,24,40,.08);
+        background: #141414;
+        border: 1px solid rgba(255,255,255,.09); border-radius: 16px;
+        padding: 14px 16px 12px; height: 100%;
+        box-shadow: 0 1px 4px rgba(0,0,0,.5);
     }
-    .mtitle { font-size: .72rem; font-weight: 700; color: #667085;
-              letter-spacing: .05em; text-transform: uppercase; }
-    .mvalue { font-size: 1.7rem; font-weight: 800; color: #101828;
-              line-height: 1.15; margin: 4px 0 8px 0; }
-    .mvalue small { font-size: .92rem; font-weight: 600; color: #98a2b3; }
-    .msub { font-size: .78rem; color: #667085; display: flex; gap: 6px;
-            align-items: center; flex-wrap: wrap; min-height: 22px; }
-    .chip { padding: 2px 9px; border-radius: 999px; font-weight: 700;
-            font-size: .73rem; white-space: nowrap; }
-    .chip-good { background: #ecfdf3; color: #067647;
-                 border: 1px solid #abefc6; }
-    .chip-bad  { background: #fef3f2; color: #b42318;
-                 border: 1px solid #fecdc9; }
-    .chip-flat { background: #eff4ff; color: #3538cd;
-                 border: 1px solid #c7d7fe; }
-    .bar { height: 6px; background: #eef2f6; border-radius: 999px;
-           overflow: hidden; margin: 2px 0 8px 0; }
-    .bar-fill { height: 100%; border-radius: 999px;
-                background: linear-gradient(90deg, #6366f1, #a855f7); }
-    .legend { font-size: .8rem; color: #475467; line-height: 1.7; }
+    .mtitle { font-size: .72rem; font-weight: 700; color: #9ca3af !important; letter-spacing: .05em; text-transform: uppercase; }
+    .mvalue { font-size: 1.7rem; font-weight: 800; color: #f9fafb !important; line-height: 1.15; margin: 4px 0 8px 0; }
+    .mvalue small { font-size: .92rem; font-weight: 600; color: #6b7280 !important; }
+    .msub { font-size: .78rem; color: #9ca3af !important; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-height: 22px; }
+
+    /* ---- Chips ---- */
+    .chip { padding: 2px 9px; border-radius: 999px; font-weight: 700; font-size: .73rem; white-space: nowrap; }
+    .chip-good { background: #052e16; color: #4ade80 !important; border: 1px solid #166534; }
+    .chip-bad  { background: #2d0a0a; color: #f87171 !important; border: 1px solid #7f1d1d; }
+    .chip-flat { background: #1e1b4b; color: #a5b4fc !important; border: 1px solid #3730a3; }
+
+    /* ---- Progress bar ---- */
+    .bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 999px; overflow: hidden; margin: 2px 0 8px 0; }
+    .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6366f1, #a855f7); }
+
+    /* ---- Legend & DataFrame ---- */
+    .legend { font-size: .8rem; color: #9ca3af; line-height: 1.7; }
     .legend .dot { font-size: .95rem; }
     div[data-testid="stDataFrame"] { border-radius: 12px; }
+
+    /* ---- Tabs ---- */
+    [data-testid="stTabs"] [role="tab"]                       { color: #9ca3af !important; }
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #ffffff !important; border-bottom-color: #6366f1 !important; }
+
+    /* ---- Code ---- */
+    /* ---- Linear Dashboard Content Styling ---- */
+    .content-wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 60px 32px;
+    }
+    .linear-hero {
+        margin-bottom: 4rem;
+    }
+    .linear-hero h1 {
+        font-size: 3.5rem !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        letter-spacing: -0.03em !important;
+        line-height: 1.1 !important;
+        margin-bottom: 1rem !important;
+        max-width: 900px;
+    }
+    .linear-hero p {
+        font-size: 1.25rem !important;
+        color: #a1a1aa !important;
+        line-height: 1.5 !important;
+        max-width: 700px !important;
+    }
+    .linear-card-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+    .linear-card {
+        background: #161618;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+    .linear-card h2 {
+        font-size: 1.1rem !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        margin-top: 0 !important;
+        margin-bottom: 1.5rem !important;
+        padding-bottom: 1rem !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+    .linear-card p, .linear-card li, .linear-card div {
+        color: #a1a1aa !important;
+        font-size: 0.95rem !important;
+        line-height: 1.6 !important;
+        margin-bottom: 1rem !important;
+    }
+    .linear-card strong {
+        color: #e4e4e7 !important;
+        font-weight: 600 !important;
+    }
+    .pass-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px 24px;
+    }
+    .pass-list div { margin-bottom: 0 !important; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -113,94 +328,117 @@ def _card(title, value, sub="", chip=None, chip_kind="flat", bar=None,
     )
 
 
-st.markdown('<div class="app-title">⚡ LLM Compiler Optimizer</div>',
-            unsafe_allow_html=True)
-st.markdown(
-    '<div class="app-sub">A graph-based compiler optimization framework '
-    "for LLMs — normalization, attention canonicalization, semantic "
-    "fusion, DAGS scheduling and partitioning, evaluated with the full "
-    "output-metric suite.</div>",
-    unsafe_allow_html=True,
-)
-st.divider()
+# ================================================================== nav bar
+st.markdown('<div class="nav-cols-row">', unsafe_allow_html=True)
 
-# ------------------------------------------------------------------ sidebar
-st.sidebar.header("🧩 Optimization Passes")
-
-normalize = st.sidebar.checkbox(
-    "Graph Normalization",
-    value=True,
-    help="Canonicalize ops, fold constants, CSE, DCE, infer shapes.",
-)
-canonicalize = st.sidebar.checkbox(
-    "Attention Graph Canonicalization",
-    value=True,
-    help="Fuse Q/K/V → QKᵀ → Scale → Softmax → AV into FusedAttention.",
-)
-operator_merge = st.sidebar.checkbox(
-    "Semantic Operator Merging",
-    value=True,
-    help="MatMul+Add→GEMM, +GELU→LinearGELU, Add+LayerNorm fusion.",
-)
-dags = st.sidebar.checkbox(
-    "Dependency-Aware Scheduling (DAGS)",
-    value=True,
-    help="Levels, critical path and a deterministic list schedule.",
-)
-partition_mode = st.sidebar.radio(
-    "Partitioning",
-    ["Off", "Graph", "Hypergraph"],
-    index=0,
-    horizontal=True,
-)
-num_partitions = st.sidebar.slider(
-    "Number of Partitions", 2, 4, 2,
-    disabled=partition_mode == "Off",
+# 1 Logo | 1 Spacer | 5 Popovers | 1 Run = 8 columns total
+_logo_col, _spacer, _p1, _p2, _p3, _p4, _p5, _run_col = st.columns(
+    [2.5, 4.0, 1.2, 0.9, 1.2, 1.3, 0.9, 0.8], gap="small"
 )
 
-st.sidebar.divider()
-st.sidebar.subheader("🧠 Learned Search")
-neuro_symbolic = st.sidebar.checkbox(
-    "Neuro-Symbolic Rewrite Search",
-    value=False,
-    help="GNN-guided symbolic rewrite rules search for extra fusion on "
-         "top of the selected passes.",
-)
-rl_search = st.sidebar.checkbox(
-    "RL Pass-Order Search (Q-learning)",
-    value=False,
-    help="Search the pass subset with tabular Q-learning and compile "
-         "with the recommended combination.",
-)
+with _logo_col:
+    # Plain text logo
+    st.markdown(
+        '''
+        <div class="nav-logo-md">
+          <span class="logo-text">LLM Compiler Optimizer</span>
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
 
-st.sidebar.divider()
-st.sidebar.subheader("🏋️ Dataset & Training")
-train_on_dataset = st.sidebar.checkbox(
-    "Train MLP on MNIST + compile it",
-    value=False,
-    help="Train a small classifier on the MNIST dataset (NumPy, manual "
-         "backprop), export the trained weights into the IR and compile "
-         "them. Cached after the first run: the first run trains (~1 "
-         "min), later runs load the cached model.",
-)
+with _spacer:
+    pass
 
-st.sidebar.divider()
-st.sidebar.subheader("🧠 Input Model")
-model_name = st.sidebar.selectbox(
-    "Model",
-    ["Demo Transformer (2 blocks)", "Demo Transformer (4 blocks)"],
-)
-num_blocks = 4 if "4 blocks" in model_name else 2
 
-original_graph = create_demo_transformer_graph(num_blocks=num_blocks)
-st.sidebar.caption(
-    f"IR: {original_graph.node_count()} ops · "
-    f"{original_graph.edge_count()} dependencies"
-)
+with _p1:
+    with st.popover("Optimization Passes"):
+        normalize = st.checkbox(
+            "Graph Normalization",
+            value=True,
+            help="Canonicalize ops, fold constants, CSE, DCE, infer shapes.",
+        )
+        canonicalize = st.checkbox(
+            "Attention Canonicalization",
+            value=True,
+            help="Fuse Q/K/V → QKᵀ → Scale → Softmax → AV into FusedAttention.",
+        )
+        operator_merge = st.checkbox(
+            "Semantic Operator Merging",
+            value=True,
+            help="MatMul+Add→GEMM, +GELU→LinearGELU, Add+LayerNorm fusion.",
+        )
+        dags = st.checkbox(
+            "DAGS Scheduling",
+            value=True,
+            help="Levels, critical path and a deterministic list schedule.",
+        )
 
-run_clicked = st.sidebar.button(
-    "🚀 Run Optimization", type="primary", use_container_width=True
-)
+with _p2:
+    with st.popover("Partitioning"):
+        partition_mode = st.radio(
+            "Mode",
+            ["Off", "Graph"],
+            index=0,
+            label_visibility="collapsed",
+        )
+        num_partitions = st.select_slider(
+            "Number of Partitions",
+            options=[2, 3, 4],
+            value=2,
+            disabled=partition_mode == "Off",
+        )
+
+with _p3:
+    with st.popover("Learned Search"):
+        neuro_symbolic = st.checkbox(
+            "Neuro-Symbolic Rewrite Search",
+            value=False,
+            help="GNN-guided symbolic rewrite rules search for extra fusion on "
+                 "top of the selected passes.",
+        )
+        rl_search = st.checkbox(
+            "RL Pass-Order Search (Q-learning)",
+            value=False,
+            help="Search the pass subset with tabular Q-learning and compile "
+                 "with the recommended combination.",
+        )
+
+with _p4:
+    with st.popover("Dataset & Training"):
+        train_on_dataset = st.checkbox(
+            "Train MLP on MNIST + compile it",
+            value=False,
+            help="Train a small classifier on the MNIST dataset (NumPy, manual "
+                 "backprop), export the trained weights into the IR and compile "
+                 "them. Cached after the first run: the first run trains (~1 "
+                 "min), later runs load the cached model.",
+        )
+
+with _p5:
+    with st.popover("Input Model"):
+        model_name = st.radio(
+            "Model",
+            ["Demo Transformer (2 blocks)", "Demo Transformer (4 blocks)"],
+            label_visibility="collapsed",
+        )
+        num_blocks = 4 if "4 blocks" in model_name else 2
+        original_graph = create_demo_transformer_graph(num_blocks=num_blocks)
+        st.caption(
+            f"IR: {original_graph.node_count()} ops · "
+            f"{original_graph.edge_count()} deps"
+        )
+
+
+with _run_col:
+    run_clicked = st.button(
+        "Run", type="primary"
+    )
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Content area wrapper
+st.markdown('<div class="content-wrap">', unsafe_allow_html=True)
 
 # ------------------------------------------------------------------ runner
 if run_clicked:
@@ -264,10 +502,49 @@ if run_clicked:
 result = st.session_state.get("result")
 
 if not result:
-    st.info(
-        "Select optimization passes in the sidebar and click "
-        "**🚀 Run Optimization** to compile the model and produce the "
-        "full output-metric report."
+    st.markdown(
+        """
+<div class="linear-hero">
+<h1>Compiler Optimization for LLM Computation Graphs</h1>
+<p>Beyond XLA: semantic fusion, attention canonicalization, and learned scheduling for transformer inference graphs.</p>
+</div>
+
+<div class="linear-card-grid">
+<div class="linear-card">
+<h2>The Problem</h2>
+<p>Modern ML compilers like Google's XLA are excellent at low-level fusion — they merge slices, concatenations, and arithmetic ops into fast kernels. But research (He, 2023, <em>PLOS ONE</em>) shows XLA treats a transformer's attention mechanism as just another set of matmuls and softmaxes, missing the fact that Q/K/V projection → scaled dot-product → softmax → weighted sum is a <strong>single semantic unit</strong> that could be fused, scheduled, and partitioned as one. XLA also struggles on high-dimensional GPU kernels with many inputs/outputs, where its float4/double2 vectorization rarely triggers.</p>
+<p>This project asks: what if the compiler understood transformer structure directly?</p>
+</div>
+
+<div class="linear-card">
+<h2>What Is an Optimization Pass?</h2>
+<p>A compiler doesn't rewrite your program all at once. It runs a series of small, focused transformations called <strong>passes</strong> — each one looks at the computation graph, finds a specific pattern, and rewrites it into something faster or smaller, while preserving the exact same output. Passes run one after another, like an assembly line.</p>
+<p>This dashboard lets you configure and run that pipeline yourself. Every control in the toolbar maps to a real technique below.</p>
+</div>
+</div>
+
+<div class="linear-card-grid">
+<div class="linear-card">
+<h2>Optimization Passes</h2>
+<div class="pass-list">
+<div><strong>Graph Normalization</strong><br>Cleans up the graph before real optimization starts: canonicalizes node names, removes no-op identity operations, folds constant arithmetic, eliminates duplicate subexpressions (CSE), and deletes unreachable dead nodes.<br><em>42 ops → 38 ops</em></div>
+<div><strong>Attention Canonicalization</strong><br>Detects the 7-op Q/K/V→score→scale→softmax→AV pattern and collapses it into a single FusedAttention node — the same trick FlashAttention uses, avoiding writing the huge intermediate score matrix to memory.<br><em>38 ops → 26 ops</em></div>
+<div><strong>Semantic Operator Merging</strong><br>Fuses adjacent op pairs that almost always run together: MatMul+Add→GEMM, GEMM+GELU→LinearGELU, Add+LayerNorm→FusedAddLayerNorm.<br><em>26 ops → 14 ops</em></div>
+<div><strong>DAGS Scheduling</strong><br>Dependency-Aware Graph Scheduling. Computes each node's dependency depth and position on the critical path, then orders execution so independent work runs in parallel without stalling.</div>
+</div>
+</div>
+<div class="linear-card">
+<h2>Partitioning & Search</h2>
+<p><strong>Partitioning</strong><br>Splits the optimized graph into balanced partitions to simulate multi-device/multi-kernel execution. Hypergraph-based partitioning is used under the hood where relevant.</p>
+<p><strong>Neuro-Symbolic Rewrite Search</strong><br>Combines a small GNN's learned cost predictions with hand-written rewrite rules.</p>
+<p><strong>RL Pass-Order Search</strong><br>Uses tabular Q-learning to search over different pass sequences, converging on a near-optimal ordering.</p>
+<br>
+<h2>Dataset & Models</h2>
+<p><strong>Train MLP on MNIST</strong><br>Trains a small MLP, exports it into the IR, then runs it through the pipeline.</p>
+<p><strong>Demo Transformers</strong><br>2 blocks (42 ops) or 4 blocks to see how techniques scale.</p>
+</div>
+</div>
+""", unsafe_allow_html=True
     )
     st.stop()
 
