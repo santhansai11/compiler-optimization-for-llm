@@ -19,6 +19,15 @@ OP_COLORS = {
     "GELU": "#ffc9de",
     "Relu": "#c8f7dc",
     "LinearRelu": "#b9f0ff",
+    "Gather": "#ffe0b3",
+    "Slice": "#e6e0f8",
+    "Reshape": "#eeeeee",
+    "Transpose": "#e0e0e0",
+    "MaskedFill": "#ffd9d9",
+    "Broadcast": "#eeeeee",
+    "Cast": "#eeeeee",
+    "Tanh": "#ffc9de",
+    "Pow": "#ffc9de",
     "Operation": "#cfe2ff",
 }
 

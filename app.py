@@ -457,8 +457,18 @@ def _jsonable(value):
     if isinstance(value, (np.floating, np.integer)):
         return value.item()
     if isinstance(value, np.ndarray):
+        if value.size > 64:
+            return f"<ndarray shape={value.shape} dtype={value.dtype}>"
         return value.tolist()
     return value
+
+
+@st.cache_resource(show_spinner=False)
+def _load_hf_graph(model_key):
+    """Import a real LLM computation graph (cached across reruns)."""
+    from models.import_hf import import_hf_graph
+
+    return import_hf_graph(model_key)
 
 
 def _chip(text, kind="flat"):
@@ -573,13 +583,60 @@ with _p4:
 
 with _p5:
     with st.popover("Input Model"):
+        from models.import_hf import HF_MODELS, is_available
+
+        choices = [
+            "Demo Transformer (2 blocks)",
+            "Demo Transformer (4 blocks)",
+        ]
+        real_available = is_available()
+        if real_available:
+            choices += [label for label, _, _ in HF_MODELS.values()]
         model_name = st.radio(
             "Model",
-            ["Demo Transformer (2 blocks)", "Demo Transformer (4 blocks)"],
+            choices,
             label_visibility="collapsed",
+            index=0,
         )
-        num_blocks = 4 if "4 blocks" in model_name else 2
-        original_graph = create_demo_transformer_graph(num_blocks=num_blocks)
+        hf_info = None
+        hf_label = next(
+            (
+                label
+                for label, _, _ in HF_MODELS.values()
+                if label == model_name
+            ),
+            None,
+        )
+        if hf_label is not None:
+            hf_key = next(
+                key for key, (label, _, _) in HF_MODELS.items()
+                if label == model_name
+            )
+            try:
+                with st.spinner(
+                    f"Tracing {hf_label} with torch.fx "
+                    "(weights download once, then cached)…"
+                ):
+                    original_graph, hf_info = _load_hf_graph(hf_key)
+            except Exception as exc:
+                st.error(
+                    f"Real-model import failed: {exc} — falling back to "
+                    "the demo transformer."
+                )
+                original_graph = create_demo_transformer_graph(
+                    num_blocks=2
+                )
+        else:
+            num_blocks = 4 if "4 blocks" in model_name else 2
+            original_graph = create_demo_transformer_graph(
+                num_blocks=num_blocks
+            )
+        if not real_available:
+            st.caption(
+                "💡 Install `pip install -r requirements-real.txt` to "
+                "compile real GPT-2-family graphs downloaded from "
+                "HuggingFace."
+            )
         st.caption(
             f"IR: {original_graph.node_count()} ops · "
             f"{original_graph.edge_count()} deps"
@@ -653,6 +710,7 @@ if run_clicked:
             "rl_info": rl_info,
             "gnn_score": gnn_score,
             "training": training_outcome,
+            "hf_info": hf_info,
         }
 
 result = st.session_state.get("result")
@@ -987,6 +1045,14 @@ tab_details, tab_sched, tab_part, tab_learn, tab_train, tab_report = st.tabs(
 )
 
 with tab_details:
+    hf_result_info = result.get("hf_info")
+    if hf_result_info:
+        st.caption(
+            f"📦 Imported from **{hf_result_info['model']}** via torch.fx · "
+            f"{hf_result_info.get('parameters', 0) / 1e6:.1f}M real "
+            f"parameters · {hf_result_info.get('torch.fx nodes')} fx nodes "
+            f"→ {hf_result_info.get('ops_emitted')} IR ops"
+        )
     for name, info in infos.items():
         st.markdown(f"**{name}**")
         st.json(_jsonable(info), expanded=False)
@@ -1125,6 +1191,68 @@ with tab_train:
             "then click Run Optimization — the first run trains the model "
             "(cached afterwards) and this tab shows the training curves, "
             "the confusion matrix and the compiled-model verification."
+        )
+
+    with st.expander("🎓 How the training works — step by step"):
+        st.markdown(
+            "The MNIST classifier is trained with **pure NumPy and a "
+            "hand-written backward pass** — no PyTorch. Six steps per "
+            "mini-batch:"
+        )
+        st.markdown("**1 — Forward pass** (batch of 64 flattened images):")
+        st.latex(
+            r"z^{(l)} = a^{(l-1)} W^{(l)} + b^{(l)}, \qquad"
+            r" a^{(l)} = \mathrm{ReLU}(z^{(l)}), \qquad"
+            r" \hat{y} = \mathrm{softmax}(z^{(3)})"
+        )
+        st.markdown("**2 — Cross-entropy loss** (how wrong the predictions "
+                    "are):")
+        st.latex(
+            r"\mathcal{L} = -\frac{1}{N}\sum_{n=1}^{N}"
+            r" \sum_{c=1}^{C} y_{n,c}\, \log \hat{y}_{n,c}"
+        )
+        st.markdown("**3 — Backpropagation** (chain rule, layer by layer; "
+                    "the softmax+CE output error simplifies to "
+                    "ŷ − y):")
+        st.latex(
+            r"\delta^{(3)} = \hat{y} - y, \qquad"
+            r" \delta^{(l)} = \left(\delta^{(l+1)} W^{(l+1)\top}\right)"
+            r" \odot \mathbb{1}\!\left[z^{(l)} > 0\right]"
+        )
+        st.latex(
+            r"\frac{\partial \mathcal{L}}{\partial W^{(l)}} ="
+            r" \delta^{(l+1)\top} a^{(l)}, \qquad"
+            r" \frac{\partial \mathcal{L}}{\partial b^{(l)}} ="
+            r" \sum_n \delta^{(l+1)}_n"
+        )
+        st.markdown("**4 — Adam update** (adaptive learning rate per "
+                    "parameter):")
+        st.latex(
+            r"m_t = \beta_1 m_{t-1} + (1-\beta_1) g_t, \quad"
+            r" v_t = \beta_2 v_{t-1} + (1-\beta_2) g_t^2"
+        )
+        st.latex(
+            r"\theta \leftarrow \theta - \alpha\,"
+            r" \hat{m}_t / (\sqrt{\hat{v}_t} + \epsilon)"
+        )
+        st.markdown(
+            "**5 — Loop**: 6 epochs × mini-batches of 64 (12 000 train / "
+            "2 000 test MNIST images) — the curves above are the loss and "
+            "accuracy recorded at every epoch."
+        )
+        st.markdown(
+            "**6 — Export & compile**: the *learned* weights are written "
+            "into the IR as `MatMul` weights + `Constant` biases, the "
+            "compiler fuses them (MatMul+Add→GEMM, +ReLU→LinearRelu), and "
+            "the compiled graph is verified **bit-exact** against the "
+            "trained model."
+        )
+        st.caption(
+            "Note: the LLMs in this project are **not trained** — they use "
+            "pretrained weights and we optimize their *inference* graph, "
+            "exactly like production compilers (XLA, TensorRT) do. The "
+            "GNN/RL models in the Learned Search tab are separate: they "
+            "learn *compiler decisions*, not model weights."
         )
 
 with tab_report:

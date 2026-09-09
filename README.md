@@ -45,6 +45,7 @@ Graphviz (`dot.exe`) must be on `PATH` for the graph charts
 11. [Experimental setup](#11-experimental-setup)
 12. [Research & discussion](#12-research-discussion)
 13. [Training on a real dataset (MNIST)](#13-training)
+14. [Importing real LLM graphs (HuggingFace + torch.fx)](#14-real-llm)
 
 ---
 
@@ -790,3 +791,81 @@ diagonal dominates; the classic 4↔9 / 3↔5 confusions remain.*
 the compiler, and the optimized artifact is verified against the
 trained model before deployment.* The UI exposes the same experiment
 (📈 training tab with the curves and the compiled-model comparison).
+
+---
+
+## 14. Importing *real* LLM graphs (HuggingFace + torch.fx) <a name="14-real-llm"></a>
+
+The demo transformers above are built programmatically. For **real**
+models the dashboard (and `verify_real_model.py`) can instead import the
+*actual* computation graph of a pretrained LLM — real architecture, real
+downloaded weights:
+
+| Option in the UI | Model | Parameters | Notes |
+|---|---|---|---|
+| Tiny GPT-2 (test) | `sshleifer/tiny-gpt2` | 2.2M | 2 MB download, instant |
+| DistilGPT-2 (real) | `distilgpt2` | 82M | 6 blocks |
+| GPT-2 (real) | `gpt2` | 124M | 12 blocks |
+
+**How it works** (`models/import_hf.py`):
+
+1. The selected model is loaded with `attn_implementation="eager"` (so
+   attention stays as explicit ops — SDPA would hide it inside one
+   black-box kernel) and traced with **concrete-tensor `torch.fx`
+   tracing** (`make_fx`, tracing_mode="real"), which handles the
+   data-shaped control flow in HF forward code that symbolic tracers
+   cannot cross.
+2. A translator walks the captured aten graph and rewrites it into this
+   project's IR: `addmm`/`linear` → `GEMM` (with the **real pretrained
+   weights** as node attributes), `embedding` → `Gather`,
+   `native_layer_norm` → `LayerNorm` (+γ/β), `mul`/`div` by a scalar →
+   `Scale`, `where`/`masked_fill` → `MaskedFill`, views →
+   `Reshape`/`Transpose`/`Slice` metadata ops, and HF's primitive-chain
+   GELU (`0.5·x·(1+tanh(√(2/π)(x+0.044715x³)))`) is pattern-folded back
+   into a single `GELU` op so kernel fusion can fire. Any op outside the
+   supported set fails the import with an explicit message — an imported
+   graph is always fully executable.
+3. From there the **identical pipeline** runs: normalize → attention
+   canonicalization (which now also matches the GPT-2-style wiring: a
+   causal-mask node between scale and softmax, Q/K/V as
+   slice→view→permute chains over one shared projection, and a decomposed
+   batched-matmul score) → operator merging → DAGS → partitioning.
+4. The result is **executed in NumPy and verified against the original
+   imported graph** — the measured metrics and the bit-exactness claim
+   apply to real downloaded models, not just the synthetic demo.
+
+**Measured results** (seq 16, batch 1, best-of-30):
+
+| Model | Ops | GRR | ACR | Kernel-launch ↓ | Measured speedup | Accuracy |
+|---|---|---|---|---|---|---|
+| Tiny GPT-2 | 113 → 61 | **46.0 %** | 100 % (2/2) | 41.9 % | **1.60×** | **100 %** (bit-exact) |
+| DistilGPT-2 | — | **48.6 %** | 100 % (6/6) | — | 1.02× | **100 %** (bit-exact) |
+| GPT-2 | 613 → 311 | **49.3 %** | 100 % (12/12) | **44.0 %** | 0.99× | **100 %** (bit-exact) |
+
+At GPT-2 scale the NumPy runtime is dominated by the large GEMMs, which
+are already optimal in the original graph — so the measured wall-clock
+speedup is neutral even though the compiled graph is half the size and
+needs 44 % fewer kernel launches. On a real GPU (the modeled column)
+those 146 eliminated launches are worth real time; on CPU the Python
+dispatch we remove is a much smaller share of 110 ms. This measured
+gap between *structural* and *wall-clock* gains at scale is itself one
+of the most interesting results in §12.
+
+**Why the reduction is smaller than the demo's 66.7 %:** real framework
+graphs carry many *bookkeeping* ops (`view`/`reshape`/`expand` — 41 of
+tiny-gpt2's 113 ops) that a real compiler executes as zero-cost views.
+They are honest members of the graph and are excluded from the
+kernel-launch count, but they dilute the node-count reduction — exactly
+the gap between textbook examples and production IRs that §12 discusses.
+Note also that `addmm`-style projections already *are* GEMMs in the
+torch graph, so semantic operator merging has fewer opportunities than
+in the naive demo graph.
+
+**Install** (optional — the demo path works without it):
+
+```
+pip install -r requirements-real.txt
+```
+
+Weights are downloaded once from the HuggingFace Hub and cached.
+Everything else (offline demo mode) keeps working without torch.
