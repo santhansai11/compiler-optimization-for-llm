@@ -33,6 +33,27 @@ CUSTOM_CSS = """
     .stApp,
     section[data-testid="stMain"],
     div[data-testid="stAppViewContainer"] { background-color: #0a0a0a !important; }
+
+    /* ---- Aurora background glows ---- */
+    .stApp::before {
+        content: ""; position: fixed; inset: 0; z-index: 0;
+        pointer-events: none;
+        background:
+            radial-gradient(640px 420px at 10% -6%, rgba(99,102,241,.16), transparent 60%),
+            radial-gradient(760px 460px at 92% -2%, rgba(168,85,247,.12), transparent 60%),
+            radial-gradient(900px 520px at 50% 112%, rgba(56,189,248,.07), transparent 60%);
+    }
+    .stApp > div { position: relative; z-index: 1; }
+
+    /* ---- Custom scrollbar ---- */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+        background: #27272a; border-radius: 999px;
+        border: 2px solid #0a0a0a;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    ::selection { background: rgba(129,140,248,.35); color: #fff; }
     .stApp > header { background: #0a0a0a !important;
                       border-bottom: 1px solid rgba(255,255,255,.07) !important; }
 
@@ -174,21 +195,52 @@ CUSTOM_CSS = """
 
     /* ---- Section title ---- */
     .section-title {
-        font-size: 1.02rem; font-weight: 700; color: #f0f0f0;
-        border-left: 4px solid #6366f1; padding-left: 10px;
-        margin: 10px 0 2px 0;
+        font-size: 1.05rem; font-weight: 700; color: #f4f4f5;
+        letter-spacing: -.01em;
+        border-left: 3px solid transparent;
+        border-image: linear-gradient(180deg, #6366f1, #a855f7) 1;
+        padding-left: 12px;
+        margin: 28px 0 14px 0;
+    }
+
+    /* ---- Logo badge ---- */
+    .logo-badge {
+        width: 27px; height: 27px; border-radius: 8px; flex-shrink: 0;
+        background: linear-gradient(135deg, #6366f1, #a855f7);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: .85rem; line-height: 1;
+        box-shadow: 0 2px 12px rgba(139,92,246,.45);
     }
 
     /* ---- Hero banner ---- */
     .hero {
-        background: linear-gradient(120deg, #3730a3 0%, #6d28d9 55%, #9333ea 100%);
-        border-radius: 20px; padding: 20px 26px; color: #fff;
+        position: relative; overflow: hidden;
+        background:
+            radial-gradient(560px 260px at 88% -10%, rgba(255,255,255,.16), transparent 60%),
+            linear-gradient(120deg, #312e81 0%, #5b21b6 55%, #7e22ce 100%);
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 20px; padding: 22px 28px; color: #fff;
         display: flex; justify-content: space-between; align-items: center;
         flex-wrap: wrap; gap: 14px;
-        box-shadow: 0 10px 40px rgba(79,70,229,.35);
+        box-shadow: 0 14px 48px rgba(79,70,229,.38);
+    }
+    .hero::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background-image:
+            linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+        background-size: 26px 26px;
+        mask-image: linear-gradient(120deg, rgba(0,0,0,.9), transparent 65%);
+        -webkit-mask-image: linear-gradient(120deg, rgba(0,0,0,.9), transparent 65%);
     }
     .hero-kicker { font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .8; color:#fff !important; }
-    .hero-big    { font-size: 2.7rem; font-weight: 800; line-height: 1.05; color: #fff !important; }
+    .hero-big    {
+        font-size: 2.9rem; font-weight: 800; line-height: 1.05;
+        background: linear-gradient(90deg, #ffffff 30%, #e9d5ff 100%);
+        -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .hero > div { position: relative; z-index: 1; }
     .hero-sub    { font-size: .9rem; opacity: .85; margin-top: 2px; color: #fff !important; }
     .hero-chips  { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 460px; }
     .hchip { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
@@ -196,10 +248,22 @@ CUSTOM_CSS = """
 
     /* ---- Metric cards ---- */
     .mcard {
-        background: #141414;
+        position: relative; overflow: hidden;
+        background: linear-gradient(180deg, #16161a 0%, #121214 100%);
         border: 1px solid rgba(255,255,255,.09); border-radius: 16px;
         padding: 14px 16px 12px; height: 100%;
         box-shadow: 0 1px 4px rgba(0,0,0,.5);
+        transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+    .mcard::before {
+        content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, #6366f1, #a855f7, #38bdf8);
+        opacity: .75;
+    }
+    .mcard:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255,255,255,.18);
+        box-shadow: 0 8px 28px rgba(0,0,0,.55);
     }
     .mtitle { font-size: .72rem; font-weight: 700; color: #9ca3af !important; letter-spacing: .05em; text-transform: uppercase; }
     .mvalue { font-size: 1.7rem; font-weight: 800; color: #f9fafb !important; line-height: 1.15; margin: 4px 0 8px 0; }
@@ -288,6 +352,97 @@ CUSTOM_CSS = """
         gap: 32px 24px;
     }
     .pass-list div { margin-bottom: 0 !important; }
+
+    /* ---- Landing page: eyebrow, gradient text, flow diagram, cards ---- */
+    .hero-eyebrow {
+        display: inline-flex; align-items: center; gap: 9px;
+        font-size: .72rem; font-weight: 700; letter-spacing: .16em;
+        color: #a5b4fc !important;
+        background: rgba(99,102,241,.08);
+        border: 1px solid rgba(99,102,241,.28);
+        border-radius: 999px; padding: 6px 14px; margin-bottom: 20px;
+    }
+    .eyebrow-dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: #34d399; box-shadow: 0 0 10px #34d399;
+    }
+    .grad-text {
+        background: linear-gradient(92deg, #a5b4fc 0%, #c084fc 52%, #7dd3fc 100%);
+        -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .cta-hint {
+        display: inline-flex; align-items: center; gap: 8px;
+        margin-top: 22px; font-size: .84rem; color: #d4d4d8 !important;
+        background: rgba(255,255,255,.04);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 10px; padding: 9px 14px;
+    }
+    .cta-hint strong { color: #fff !important; }
+
+    .flow-wrap { margin: 34px 0 40px 0; }
+    .flow-title {
+        font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+        color: #71717a !important; font-weight: 700; margin-bottom: 12px;
+    }
+    .flow { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+    .flow-step {
+        display: flex; align-items: center; gap: 10px;
+        background: linear-gradient(180deg, #17171a, #131316);
+        border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+        padding: 10px 14px;
+        transition: border-color .16s ease, transform .16s ease;
+    }
+    .flow-step:hover { border-color: rgba(168,85,247,.4); transform: translateY(-2px); }
+    .flow-step strong { color: #f4f4f5 !important; font-size: .88rem; display: block; line-height: 1.2; }
+    .flow-step small { color: #8b8b94 !important; font-size: .72rem; }
+    .fnum {
+        width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+        background: linear-gradient(135deg, #312e81, #6d28d9);
+        color: #fff !important; font-size: .72rem; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .flow-accent {
+        border-color: rgba(168,85,247,.45);
+        box-shadow: 0 0 0 1px rgba(168,85,247,.15), 0 4px 20px rgba(168,85,247,.12);
+    }
+    .flow-arrow { align-self: center; color: #52525b !important; font-size: 1.05rem; }
+
+    .linear-card {
+        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .linear-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(255,255,255,.12);
+        box-shadow: 0 12px 44px rgba(0,0,0,.45);
+    }
+    .lc-head {
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 1.2rem; padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .lc-head h2 { margin: 0 !important; padding: 0 !important; border: none !important; }
+    .lc-icon {
+        width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+    }
+    .lc-red    { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.28); }
+    .lc-blue   { background: rgba(96,165,250,.12);  border: 1px solid rgba(96,165,250,.28); }
+    .lc-purple { background: rgba(192,132,252,.12); border: 1px solid rgba(192,132,252,.28); }
+    .lc-green  { background: rgba(74,222,128,.12);  border: 1px solid rgba(74,222,128,.28); }
+    .lc-amber  { background: rgba(251,191,36,.12);  border: 1px solid rgba(251,191,36,.28); }
+
+    .pass-item { display: flex; gap: 12px; align-items: flex-start; }
+    .pass-num {
+        font-size: .7rem; font-weight: 800; color: #818cf8 !important;
+        background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.28);
+        border-radius: 7px; padding: 2px 7px; margin-top: 2px;
+        height: fit-content; white-space: nowrap;
+    }
+
+    /* ---- Tabs hover ---- */
+    [data-testid="stTabs"] [role="tab"]:hover { color: #e4e4e7 !important; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -341,6 +496,7 @@ with _logo_col:
     st.markdown(
         '''
         <div class="nav-logo-md">
+          <span class="logo-badge">⚡</span>
           <span class="logo-text">LLM Compiler Optimizer</span>
         </div>
         ''',
@@ -505,19 +661,36 @@ if not result:
     st.markdown(
         """
 <div class="linear-hero">
-<h1>Compiler Optimization for LLM Computation Graphs</h1>
-<p>Beyond XLA: semantic fusion, attention canonicalization, and learned scheduling for transformer inference graphs.</p>
+<div class="hero-eyebrow"><span class="eyebrow-dot"></span>INTERACTIVE COMPILER PLAYGROUND</div>
+<h1>Compiler Optimization for <span class="grad-text">LLM Computation Graphs</span></h1>
+<p>Beyond XLA: semantic fusion, attention canonicalization, and learned scheduling for transformer inference graphs — running live, entirely in NumPy.</p>
+<div class="cta-hint">🎛️ Configure the pipeline with the toolbar above ▸ then press <strong>Run</strong> to compile and benchmark</div>
+</div>
+
+<div class="flow-wrap">
+<div class="flow-title">The pipeline you're about to run</div>
+<div class="flow">
+<div class="flow-step"><span class="fnum">1</span><div><strong>Normalize</strong><small>fold · CSE · DCE</small></div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><span class="fnum">2</span><div><strong>Canonicalize</strong><small>attention fusion</small></div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><span class="fnum">3</span><div><strong>Merge</strong><small>GEMM · LinearGELU</small></div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><span class="fnum">4</span><div><strong>Schedule</strong><small>DAGS levels</small></div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step flow-accent"><span class="fnum">5</span><div><strong>Partition</strong><small>multi-kernel</small></div></div>
+</div>
 </div>
 
 <div class="linear-card-grid">
 <div class="linear-card">
-<h2>The Problem</h2>
+<div class="lc-head"><span class="lc-icon lc-red">⚠️</span><h2>The Problem</h2></div>
 <p>Modern ML compilers like Google's XLA are excellent at low-level fusion — they merge slices, concatenations, and arithmetic ops into fast kernels. But research (He, 2023, <em>PLOS ONE</em>) shows XLA treats a transformer's attention mechanism as just another set of matmuls and softmaxes, missing the fact that Q/K/V projection → scaled dot-product → softmax → weighted sum is a <strong>single semantic unit</strong> that could be fused, scheduled, and partitioned as one. XLA also struggles on high-dimensional GPU kernels with many inputs/outputs, where its float4/double2 vectorization rarely triggers.</p>
-<p>This project asks: what if the compiler understood transformer structure directly?</p>
+<p>This project asks: <strong>what if the compiler understood transformer structure directly?</strong></p>
 </div>
 
 <div class="linear-card">
-<h2>What Is an Optimization Pass?</h2>
+<div class="lc-head"><span class="lc-icon lc-blue">⚙️</span><h2>What Is an Optimization Pass?</h2></div>
 <p>A compiler doesn't rewrite your program all at once. It runs a series of small, focused transformations called <strong>passes</strong> — each one looks at the computation graph, finds a specific pattern, and rewrites it into something faster or smaller, while preserving the exact same output. Passes run one after another, like an assembly line.</p>
 <p>This dashboard lets you configure and run that pipeline yourself. Every control in the toolbar maps to a real technique below.</p>
 </div>
@@ -525,21 +698,20 @@ if not result:
 
 <div class="linear-card-grid">
 <div class="linear-card">
-<h2>Optimization Passes</h2>
+<div class="lc-head"><span class="lc-icon lc-purple">🧬</span><h2>Optimization Passes</h2></div>
 <div class="pass-list">
-<div><strong>Graph Normalization</strong><br>Cleans up the graph before real optimization starts: canonicalizes node names, removes no-op identity operations, folds constant arithmetic, eliminates duplicate subexpressions (CSE), and deletes unreachable dead nodes.<br><em>42 ops → 38 ops</em></div>
-<div><strong>Attention Canonicalization</strong><br>Detects the 7-op Q/K/V→score→scale→softmax→AV pattern and collapses it into a single FusedAttention node — the same trick FlashAttention uses, avoiding writing the huge intermediate score matrix to memory.<br><em>38 ops → 26 ops</em></div>
-<div><strong>Semantic Operator Merging</strong><br>Fuses adjacent op pairs that almost always run together: MatMul+Add→GEMM, GEMM+GELU→LinearGELU, Add+LayerNorm→FusedAddLayerNorm.<br><em>26 ops → 14 ops</em></div>
-<div><strong>DAGS Scheduling</strong><br>Dependency-Aware Graph Scheduling. Computes each node's dependency depth and position on the critical path, then orders execution so independent work runs in parallel without stalling.</div>
+<div class="pass-item"><span class="pass-num">01</span><div><strong>Graph Normalization</strong><br>Cleans up the graph before real optimization starts: canonicalizes node names, removes no-op identity operations, folds constant arithmetic, eliminates duplicate subexpressions (CSE), and deletes unreachable dead nodes.<br><em>42 ops → 38 ops</em></div></div>
+<div class="pass-item"><span class="pass-num">02</span><div><strong>Attention Canonicalization</strong><br>Detects the 7-op Q/K/V→score→scale→softmax→AV pattern and collapses it into a single FusedAttention node — the same trick FlashAttention uses, avoiding writing the huge intermediate score matrix to memory.<br><em>38 ops → 26 ops</em></div></div>
+<div class="pass-item"><span class="pass-num">03</span><div><strong>Semantic Operator Merging</strong><br>Fuses adjacent op pairs that almost always run together: MatMul+Add→GEMM, GEMM+GELU→LinearGELU, Add+LayerNorm→FusedAddLayerNorm.<br><em>26 ops → 14 ops</em></div></div>
+<div class="pass-item"><span class="pass-num">04</span><div><strong>DAGS Scheduling</strong><br>Dependency-Aware Graph Scheduling. Computes each node's dependency depth and position on the critical path, then orders execution so independent work runs in parallel without stalling.</div></div>
 </div>
 </div>
 <div class="linear-card">
-<h2>Partitioning & Search</h2>
+<div class="lc-head"><span class="lc-icon lc-green">🧠</span><h2>Partitioning &amp; Search</h2></div>
 <p><strong>Partitioning</strong><br>Splits the optimized graph into balanced partitions to simulate multi-device/multi-kernel execution. Hypergraph-based partitioning is used under the hood where relevant.</p>
 <p><strong>Neuro-Symbolic Rewrite Search</strong><br>Combines a small GNN's learned cost predictions with hand-written rewrite rules.</p>
 <p><strong>RL Pass-Order Search</strong><br>Uses tabular Q-learning to search over different pass sequences, converging on a near-optimal ordering.</p>
-<br>
-<h2>Dataset & Models</h2>
+<div class="lc-head" style="margin-top:1.6rem;"><span class="lc-icon lc-amber">📦</span><h2>Dataset &amp; Models</h2></div>
 <p><strong>Train MLP on MNIST</strong><br>Trains a small MLP, exports it into the IR, then runs it through the pipeline.</p>
 <p><strong>Demo Transformers</strong><br>2 blocks (42 ops) or 4 blocks to see how techniques scale.</p>
 </div>
