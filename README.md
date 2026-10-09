@@ -1,792 +1,397 @@
-# LLM Compiler Optimizer
+# GraphForge — LLM computation graph optimization
 
-Graph-based **compiler optimization for LLM-style models**: fusion, scheduling,
-partitioning, and learned search on a computation-graph IR — plus a small
-**MNIST train → export → compile** experiment.
+GraphForge is a research prototype for visualizing computation graphs and exploring graph normalization and semantic operator merging. A React dashboard displays hand-built model-shaped DAG examples and runs a separate PyTorch FX attention benchmark with an optional JAX/OpenXLA CPU comparison. Each completed comparison or sweep can be downloaded as a separate Excel workbook.
 
-*A beginner-friendly walkthrough of what this project does, why it
-exists, what goes in, how it works, and what comes out.*
+This repository currently demonstrates synthetic inputs and model-shaped graph templates. The selectable Transformer and MLP DAGs are assembled by project code; they are not captured from a real model file, a text dataset, or the benchmark's input tensors. The separate attention benchmark does trace a small PyTorch attention module with FX. This is **not** an LLM training system, a production compiler, or a trained optimizer based on PassNet. The current GNN training script uses synthetic graphs and modeled labels. Dataset integration and data-backed optimizer training are described below as next work.
 
-## Quick start
+## Contents
+
+- [At a glance](#at-a-glance)
+- [Active scope](#active-scope)
+- [The dataset to use](#the-dataset-to-use)
+- [What the current workload computes](#what-the-current-workload-computes)
+- [Dashboard controls and graph sources](#dashboard-controls-and-graph-sources)
+- [Pipeline walkthrough](#pipeline-walkthrough)
+- [Algorithms and why these choices](#algorithms-and-why-these-choices)
+- [Metrics and their limits](#metrics-and-their-limits)
+- [XLA comparison](#xla-comparison)
+- [Dashboard and Excel reports](#dashboard-and-excel-reports)
+- [Setup and run](#setup-and-run)
+- [Training: current state and correct next step](#training-current-state-and-correct-next-step)
+- [Repository map](#repository-map)
+- [Known limitations](#known-limitations)
+- [Sources](#sources)
+- [TODO — what is still missing](#todo--what-is-still-missing)
+
+## At a glance
+
+| Question | Current answer |
+| --- | --- |
+| Where does the graph come from? | The selectable architecture DAGs are hand-built templates. A separate attention benchmark captures a PyTorch function with `torch.fx`. |
+| Which optimization passes are active in the dashboard? | Graph normalization and semantic operator merging. DAG construction is the graph representation step. |
+| What dataset is recommended for future training/evaluation? | [PassNet](https://huggingface.co/datasets/PassNet/PassNet): a public corpus of graph/model code records and optimization examples. |
+| Is PassNet loaded and used to train the current model? | No. The data adapter and evaluation-label pipeline are not integrated yet. |
+| What is the current XLA comparison? | When JAX is installed, a real JAX `jit`/OpenXLA CPU compile-and-run of the separate attention function; compile time and steady-state time are separate. |
+| Where are run reports? | `outputs/benchmark_reports/metrics_<UTC timestamp>_<id>.xlsx`, one workbook per completed dashboard comparison or sweep. |
+
+## Active scope
+
+The current experiment intentionally concentrates on:
+
+1. **DAG construction:** build nodes and dependency edges from a selected custom IR template, or capture the separate supported PyTorch attention function with FX.
+2. **Graph normalization:** clean up the representation while preserving its computation.
+3. **Semantic operator merging:** replace recognized multi-operation patterns with a single semantic fused node.
+
+Attention canonicalization as a separate pass, DAGS scheduling, graph partitioning, RL search, and compiler pass generation are not part of the dashboard's active optimization run. Some of those modules remain in the repository from earlier experiments; their presence does not mean the dashboard currently applies them.
+
+Scope detail: the **selected custom IR graph pipeline** runs normalization and semantic merging, with DAG construction as the representation step. The separate attention FX scripts also call `schedule_fx` to calculate dependency levels and attach schedule metadata after merging. That helper does not reorder the FX graph or change the function executed by PyTorch, and it is not used by the selected custom IR pipeline. The scheduling metadata should not be interpreted as a measured scheduling optimization; removing it from the attention benchmark or surfacing it as a separate analysis is on the TODO list.
+
+## The dataset to use
+
+### Recommendation: PassNet
+
+Use the **PassNet** graph corpus and its related PassBench evaluation examples as the leading source for compiler-optimization training data. The Hugging Face dataset card currently reports **2,067,810 records and 967 MB** in Parquet form, with an MIT license. The records contain paths and text content for model files, graph metadata, weights metadata, and input metadata. The PassNet paper describes over 18,000 unique computation graphs mined from 100,000 real-world models; those are unique graphs, while the 2.07M Hugging Face rows are file-level records and should not be reported as 2.07M unique graphs. [Dataset card](https://huggingface.co/datasets/PassNet/PassNet) · [PassNet paper](https://arxiv.org/abs/2605.29357) · [PassNet source repository](https://github.com/PaddlePaddle/PassNet)
+
+PassNet is relevant because it contains real model subgraphs and fusible subgraph examples, which match the graph-rewrite problem more closely than a natural-language prompt corpus or a classification dataset. Its benchmark flow checks output correctness and measures execution speed after a candidate pass. The upstream evaluation setup is CUDA-centered (its README currently specifies Python 3.12+, PyTorch 2.9+, CUDA 12.8, and an NVIDIA GPU); it is not a drop-in PyTorch FX dataset loader for this project. We should use its graph examples as source material, then adapt and re-evaluate compatible cases with our own passes and devices.
+
+PassNet and a text corpus solve different problems. **PassNet is a candidate source of graph structures and compiler-optimization examples.** A dataset such as WikiText-2 can provide real text to tokenize and feed into a language model, but text alone does not provide graph-rewrite labels. A real end-to-end benchmark needs both an actual model with weights and actual tokenized inputs; a graph-optimizer training set additionally needs correctness and measured-performance labels generated by running our transformations.
+
+### Why not the other common choices?
+
+| Option | Why it is not the first choice for this project |
+| --- | --- |
+| MNIST | Image labels train a classifier. They do not label whether graph normalization or a semantic merge is correct or faster. The existing MNIST MLP experiment is separate from the attention graph work. |
+| A text dataset such as C4 or WikiText | It supplies model inputs for language modeling, not computation DAGs or pass-performance labels. It is not an optimizer training dataset by itself. |
+| TorchBench | It is a useful suite of real PyTorch workloads and benchmark harnesses, but it is a model/workload suite rather than one ready-made corpus of rewrite examples. It is a strong later validation set. [TorchBench](https://github.com/pytorch/benchmark) |
+| Google TPU Graphs | It contains computation graphs and compiler-configuration runtime labels, but targets TPU/XLA layout and tiling choices. That makes it useful for graph cost prediction, less direct for the current PyTorch semantic-rewrite task. [TPU Graphs](https://github.com/google-research-datasets/tpu_graphs) |
+| Random synthetic DAGs | Useful for checking that a graph model can train and that code paths run; they do not establish real-workload generalization. |
+
+### What a real data pipeline must do
+
+PassNet should not be treated as a table of ready-to-use labels for *our* passes. The project needs to build those labels:
+
+1. Read the upstream training split and retain graph/model records that can be represented by the operations our IR understands.
+2. Convert each supported case into a DAG with operation type, dependency edges, tensor shapes, dtype, constants/attributes, and source-model identity.
+3. Run baseline and normalized/merged programs on the same device, inputs, and weights.
+4. Reject cases that fail graph capture or numerical equivalence.
+5. Record repeatable baseline and optimized latency, peak device memory when available, transformed node/edge counts, and pass time. Keep CPU measurements, GPU measurements, and cost-model estimates in separate columns.
+6. Split by **source model**, not by individual graph-file row, so near-duplicate graphs from one model cannot leak between train and test.
+7. Train a PyTorch GNN to predict candidate benefit or rank whether a legal normalization/merge should be applied. Keep the optimizer's rewrites symbolic and rule-based; do not have a model invent arbitrary graph code.
+8. Evaluate the trained ranker on a held-out model set and confirm that the selected rewrites still pass numerical checks and improve measured runtime.
+
+The PassNet dataset is identified and documented here, but this adapter, GPU-label collection, and PassNet-trained checkpoint are **not implemented yet**. No downloaded dataset or PassNet-trained model is included in this checkout.
+
+## What the current workload computes
+
+The dashboard's attention demo uses a small PyTorch module with input tensor shape `(batch, sequence, d_model)`:
+
+```python
+q = x @ Wq
+k = x @ Wk
+v = x @ Wv
+scores = (q @ k.transpose(-2, -1)) / sqrt(d_model)
+weights = softmax(scores, dim=-1)
+output = weights @ v
+```
+
+The actual module and FX merge implementation are in [`models/attention.py`](models/attention.py) and [`passes/semantic_merge.py`](passes/semantic_merge.py). The sample is deliberately small enough to run on a CPU. It gives us graph patterns such as matrix multiplication, transpose, scalar division, softmax, and the final attention/value product. It is not a full LLM with tokenizer, embedding table, KV cache, decoder stack, or a text-generation dataset.
+
+The UI also offers model-shaped IR examples, including Transformer-shaped graphs and an MLP classifier. Those diagrams exercise the repository's custom IR pipeline; they are assembled from fixed operation templates. The per-shape attention sweep is a separate PyTorch FX benchmark path.
+
+## Dashboard controls and graph sources
+
+The controls currently combine two related but separate demonstrations. **Run comparison** applies the custom IR passes to the selected architecture template, then also runs the separate attention benchmark and attempts to save both results in one workbook. The model selector changes the custom IR example. Batch, sequence, and `d_model` are used as shape/configuration inputs; they also parameterize the separate attention benchmark. The selected architecture does **not** change the function used by the XLA comparison.
+
+### Model graph selector
+
+| UI choice | What the template represents | What it does not represent |
+| --- | --- | --- |
+| Post-LN Transformer (2 blocks) | A two-block post-LayerNorm Transformer-shaped custom IR graph. Each block represents projections, scaled attention, a feed-forward section, residual paths, normalization, and a dropout/identity node. | It is not a loaded Transformer checkpoint and does not consume token IDs. |
+| Post-LN Transformer (4 blocks) | The same template repeated for four blocks. Its current builder produces 76 nodes before normalization. | It is not a four-layer pretrained language model. |
+| Pre-LN Transformer (GPT/LLaMA) | A two-block pre-LayerNorm-shaped custom IR graph with normalization before attention/feed-forward branches. | It is not an actual GPT/LLaMA implementation, tokenizer, or weight set. |
+| Post-LN + ReLU FFN | The post-LN template with ReLU in the feed-forward activation slot, for exercising activation-related rewrite rules. | It is not a trained model or a runtime kernel fusion. |
+| MLP Classifier (784-256-64-10) | A fully connected graph with 784 input features, hidden widths 256 and 64, and 10 output values/classes. The 784 dimension is consistent with flattened 28×28 images. | Despite the UI description, the current API creates random graph weights and does not load MNIST examples or a trained MNIST checkpoint. |
+
+The Transformer and MLP graph builders are in [`models/transformer.py`](models/transformer.py) and [`models/architectures.py`](models/architectures.py); model selection and request handling are in [`api_server.py`](api_server.py). These files explicitly add graph operations and dependency edges. This is intentional prototype scaffolding, not automatic model discovery.
+
+### Numeric workload controls
+
+| Control | Meaning | Current use and limits |
+| --- | --- | --- |
+| Batch | Number of examples/sequences processed together. | Stored in Transformer graph configuration and used as the leading dimension in the attention benchmark input. It normally changes tensor sizes, not the count of operation nodes. The MLP builder fixes its graph batch to 256. |
+| Sequence | Number of token positions in each synthetic sequence. | Stored in the Transformer graph configuration and sets the middle dimension of attention input. These positions are not tokenized words. |
+| `d_model` | Width of the feature vector at each token position (Transformer hidden size). | Stored in graph metadata and sets the last attention input dimension plus the Q/K/V projection matrix sizes. It normally changes tensor shapes and compute volume, not the operation-node count. |
+
+The attention benchmark input is a random float32 tensor `x` shaped `(batch, sequence, d_model)`. Its three projection matrices are also initialized randomly. With the default values, the input shape is `(4, 64, 64)`. The sequence positions do not contain words, and there is no tokenizer, language corpus, embedding table, or pretrained LLM in this path. The FX benchmark creates and checks actual tensor outputs, but it is a synthetic attention microbenchmark rather than an end-to-end language-model run.
+
+### Why node counts stay fixed—and known count mismatch
+
+A computation graph's node count reflects how many operations its template contains. Batch size and tensor dimensions affect the data flowing through those operations but do not replicate the operation nodes, so the count remains stable when those controls change. Changing the selected architecture or number of Transformer blocks should change the graph. In the current builder, the two-block post-LN example starts at 42 nodes and the four-block example starts at 76 nodes (before normalization). The `/api/models` catalog currently advertises 78 for the four-block example; that catalog value is stale and should be corrected. If the displayed graph does not change after selecting a different architecture and rerunning, check that a new comparison completed and that you are viewing its result.
+
+### What operation is benchmarked and compared?
+
+The separately traced FX/XLA operation is single-head scaled dot-product self-attention:
+
+```python
+q = x @ Wq
+k = x @ Wk
+v = x @ Wv
+scores = (q @ k.transpose(-2, -1)) / sqrt(d_model)
+weights = softmax(scores, dim=-1)
+output = weights @ v
+```
+
+The original and semantically rewritten PyTorch functions use the same generated input and weights. The XLA arm computes the equivalent equations in JAX, lowers and compiles them with `jax.jit`/OpenXLA, then executes the compiled function on the JAX CPU device. This XLA result is not the selected custom Transformer DAG compiled by XLA, and it is not a comparison against our own generated GPU kernel. The XLA result is real when the API reports a successful run with backend/device details and StableHLO; if JAX is missing or compilation fails, the UI should report the backend as unavailable instead of treating a previous number as a new measurement.
+
+### Dashboard sections
+
+| Section | What it displays |
+| --- | --- |
+| Overview | Latest reported counts, selected metrics, and bar-chart summaries. Read each chart's “measured,” “modeled,” or “estimated” label before interpreting a value. |
+| Graph transforms | Original and transformed custom IR graphs, stage counts, and normalization/semantic-merge results for the selected architecture template. Nodes/edges are the visible graph structure; they are not a generated machine-code listing. |
+| XLA comparison | PyTorch eager, PyTorch FX semantic reference, and JAX/OpenXLA CPU timings for the separate attention workload; also correctness, compile time, and StableHLO operation count when available. |
+| Stress sweep | Repeats the attention microbenchmark for a collection of batch/sequence/hidden-size shapes. It is not a dataset evaluation. |
+
+The attention semantic node is a graph-level rewrite description. Unless a backend actually lowers it to a fused kernel, the name “fused” alone does not mean fewer physical GPU launches or faster execution.
+
+## Pipeline walkthrough
+
+### 1. Create a PyTorch workload
+
+Choose the model and tensor dimensions. The weights and random input are initialized deterministically in the sweep so each baseline/optimized pair receives the same values.
+
+### 2. Capture or construct a DAG
+
+For the attention microbenchmark, `torch.fx.symbolic_trace(model)` captures the Python-level forward graph. Each FX operation becomes a node, and each value dependency becomes an edge. The graph is a DAG because forward tensor dependencies are acyclic for this static attention example. This is not how the selectable Transformer and MLP templates are built: those use explicit project code to create custom IR operations and edges.
+
+```python
+import torch.fx as fx
+
+original = fx.symbolic_trace(model)
+optimized = fx.symbolic_trace(model)
+```
+
+The dashboard also has a custom `ComputationGraph` IR with explicit operation attributes and dependency edges. Its architecture examples are created in `models/architectures.py` and `models/transformer.py`.
+
+### 3. Normalize the graph
+
+The normalizer standardizes op names, removes identity nodes, folds supported constant-only operations, merges safe duplicate expressions, removes unreachable/dead operations, and infers shape metadata where available. The pass lives in [`passes/normalize.py`](passes/normalize.py). The transformations must preserve values; the report's output comparison is the guardrail.
+
+### 4. Merge semantic operator patterns
+
+The FX attention rewrite recognizes the score/scale/softmax/value sequence and replaces the recognized subgraph with a `fused_attention` semantic operation. Other IR semantic merges are implemented in `passes/merge.py`. These nodes describe a fused operation at the graph/semantic level. They do not by themselves prove that the runtime emitted a single optimized GPU kernel; the current measured FX path executes a Python/PyTorch reference function.
+
+```python
+normalized = normalize(optimized)
+merged = semantic_merge_attention(normalized)
+if not merged:
+    raise RuntimeError("Attention pattern not detected")
+```
+
+### 5. Check correctness
+
+The benchmark uses `torch.allclose` with documented tolerances and also reports the maximum absolute output error. A transformation that does not match its baseline must not be presented as a successful optimization.
+
+### 6. Measure and compare
+
+The local FX sweep warms each function, records repeated wall-clock calls, and reports medians, latency, token throughput, graph-size change, pass time, and correctness. The XLA panel compiles an equivalent JAX function and separates compile time from steady-state latency.
+
+### 7. Save the run
+
+After a comparison or sweep completes, the API generates a new timestamped `.xlsx` workbook. It does not overwrite the previous workbook.
+
+## Algorithms and why these choices
+
+### DAG representation
+
+A DAG makes data dependencies explicit. That allows the project to identify patterns spanning multiple operators and visualize exactly which producer/consumer relationships a rewrite changes. Alternatives such as timing only the whole model make it harder to explain or compare transformations.
+
+### Graph normalization
+
+Normalization is applied before pattern matching so redundant or inconsistent graph structure does not unnecessarily block a semantic rewrite. It is deterministic and inspectable. The current pass handles a limited operator and attribute set; it is not a universal algebraic optimizer.
+
+### Semantic operator merging
+
+The merger recognizes known patterns instead of merging by operation names alone. The attention rewrite preserves the meaning of the observed Q/K/V path and emits a semantic fused node. Pattern rules are easier to audit for correctness than a learned system that directly edits arbitrary graphs.
+
+### Why not train a large language model to output the DAG?
+
+The DAG is already determined by the framework program and tensor dependencies. `torch.fx` can capture it without training. A generative language model can emit invalid edges, omit dependencies, or produce a graph inconsistent with tensor shapes. The useful learned subproblem is usually **predicting which legal rewrite is worth trying** from graph structure and measured labels. The current repository's GNN is an early prototype; it is not used to build the attention DAG.
+
+### Other ideas shown in the reference methodology image
+
+The image also mentions attention canonicalization, Dependency-Aware Graph Scheduling, and graph partitioning/scheduling. These are reasonable compiler techniques, but they are deliberately outside the current dashboard run so that comparisons isolate normalization and semantic operator merging. They should be added only with their own correctness and measurement evidence.
+
+## Metrics and their limits
+
+The dashboard and workbooks use these requested measures where the current pipeline can provide a defensible value. The active API has multiple paths: custom architecture-template graph metrics, a separate FX attention microbenchmark, and a separate XLA attention benchmark. A metric belongs to the path identified by its panel/workbook context; do not read all displayed values as measurements of one end-to-end LLM run.
+
+| Metric | Meaning in this project | Status / interpretation |
+| --- | --- | --- |
+| Inference latency | Time for one invocation of the measured graph/function. | The selected custom-IR overview uses the minimum of 30 NumPy-executor samples after 2 warmups. The FX sweep and XLA panel report medians after their own warmups. All are CPU reference timings; compare only within matching paths/settings. XLA compile time is separate. |
+| Throughput | Completed items per second, derived from latency. | Custom-IR overview reports samples/s from batch size. Attention FX/XLA report token positions/s (`batch × sequence / latency`). Neither is server request throughput. |
+| Speedup | Baseline latency divided by optimized latency. | Above 1 means faster; below 1 means slower. Small CPU changes are noisy. |
+| Peak GPU memory | Device high-water memory usage. | Not measured. The custom IR overview tracks live NumPy array bytes inside its executor, and the cost-model GPU-like memory estimate is separate; neither is actual GPU process/device memory. |
+| Graph Reduction Ratio (GRR) | `(original compute nodes − optimized compute nodes) / original compute nodes`. | Structural change; a smaller graph is not automatically faster. In the architecture comparison this counts custom IR nodes; in the FX sweep it counts FX compute nodes. |
+| Accuracy preservation | Whether outputs are within tolerance, plus max absolute error. | A pass/fail check, not a task-level language-model accuracy score. |
+| Operator Merge Ratio (OMR) | Fraction of original graph nodes removed by the semantic merging pass. | Structural rewrite ratio; not a speedup. |
+| Attention Canonicalization Rate (ACR) | Fraction of detected attention patterns merged by the attention rule inside semantic merging. | Reported when a supported attention pattern is detected; otherwise `N/A`. Attention matching is currently inside semantic merging, not a separate active pass. |
+| Kernel launch reduction | Difference between original and optimized estimated launches. | Heuristic proxy based on custom IR operations, not an observed GPU launch count. |
+| Compilation time | Time spent building/transforming a graph or compiling XLA, depending on the panel. | Custom IR pass time, FX transform time, and backend compile time are distinct. The XLA panel reports JAX/XLA compilation separately from execution. |
+
+The custom cost model in [`utils/cost_model.py`](utils/cost_model.py) assigns hand-written per-op estimates. These values are for illustration and must always be labeled **modeled**. The NumPy executor in `utils/executor.py` reports reference-run measurements, not PyTorch GPU performance. Benchmark conclusions should use the same device, dtype, input shapes, warmup, and measurement methodology across backends.
+
+## XLA comparison
+
+[`xla_compare.py`](xla_compare.py) compares the same seeded attention workload and weights using PyTorch FX and JAX `jit`/OpenXLA on CPU. The report includes:
+
+- median latency and derived token throughput after warmup;
+- separate XLA/JAX compilation time;
+- output error and tolerance check against the PyTorch reference;
+- FX node counts before/after this project's normalization and merge;
+- StableHLO operation count, kept separate because StableHLO and FX are different IRs.
+
+This is a small-scale reference comparison. It does not compare identical compiler pipelines, does not establish GPU XLA performance, and does not claim that our semantic fused node is emitted as a fused low-level kernel. A backend can be slower for small CPU shapes, as observed in the earlier demo.
+
+## Dashboard and Excel reports
+
+The site is a React/Vite frontend backed by a small Python HTTP API. The graph panels lay nodes out by topological dependency depth. Each graph has `+`, `−`, and `Fit` controls, and both axes scroll when the graph extends beyond the panel. This avoids squeezing a wide graph into a tiny fixed-size preview.
+
+When a **Run comparison** action finishes, the Excel file includes:
+
+- `Summary`: run ID/time, workload, all compiler metrics and pass metadata;
+- `XLA`: backend timing, throughput, compile duration, correctness, and IR counts;
+- `Graph stages`: graph node counts before and after the active passes.
+
+When a stress sweep finishes, the workbook includes a `Workload sweep` sheet with one row per input shape, including latency, throughput, GRR/OMR, error, correctness, pass time, and explicit N/A/estimated values for GPU-only or inactive-pass metrics. Each new run creates a fresh filename in `outputs/benchmark_reports/`. The dashboard's **Download XLSX** control downloads the latest workbook. Generated reports are ignored by Git.
+
+The writer uses the bundled `@oai/artifact-tool` spreadsheet runtime through [`tools/export_metrics.mjs`](tools/export_metrics.mjs). In this checkout, `tools/node_modules` is a local junction to the Codex bundled runtime; it is ignored by Git. If using the project outside this Codex desktop environment, configure Node.js and install/provide `@oai/artifact-tool` under `tools/node_modules` before using Excel export. The benchmark itself does not depend on Excel.
+
+## Setup and run
+
+### Requirements
+
+- Python 3.12 (the launcher uses `.venv` and does not install Python automatically)
+- Node.js and npm
+- A browser
+- Optional: JAX for the XLA tab. The current comparison is CPU-only.
+
+### One-time setup on Windows
 
 ```powershell
-git clone https://github.com/santhansai11/compiler-optimization-for-llm.git
-cd compiler-optimization-for-llm
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+npm --prefix frontend install
+```
+
+If `py -3.12` reports “No suitable Python runtime found,” install Python 3.12 and the Windows Python launcher, reopen PowerShell, then repeat the setup. `run-server.bat` expects the `.venv` to exist; it intentionally does not install Python or silently select another interpreter.
+
+### Start the dashboard
+
+```powershell
 .\run-server.bat
 ```
 
-Then open **http://localhost:8501**. The batch file creates `.venv312` if needed,
-installs `requirements.txt`, and starts Streamlit.
+Open [http://localhost:5173](http://localhost:5173). The launcher starts the API on `127.0.0.1:8000` and Vite on port 5173. Keep the launcher terminal open while using the site.
 
-CLI (after the venv exists):
+### CLI examples
 
 ```powershell
-.\.venv312\Scripts\python.exe main.py
-.\.venv312\Scripts\python.exe main.py --train
+.\.venv\Scripts\python.exe run_attention_optimization.py
+.\.venv\Scripts\python.exe training\train_optimizer.py --graphs 96 --epochs 160
+npm --prefix frontend run build
 ```
 
-Graphviz (`dot.exe`) must be on `PATH` for the graph charts
-(typical install: `C:\Program Files\Graphviz\bin`).
-
----
-
-## Table of Contents
-
-1. [Background: the ideas you need first](#1-background)
-2. [What are we building?](#2-what-are-we-building)
-3. [What is the input?](#3-inputs)
-4. [How the original graph is formed](#4-original-graph)
-5. [Methodology — the 9 techniques explained](#5-methodology)
-6. [How we measure: the 10 output metrics](#6-metrics)
-7. [Outputs — what you actually see](#7-outputs)
-8. [Results summary](#8-results)
-9. [Honest limitations](#9-limitations)
-10. [How to run it & project structure](#10-running)
-11. [Experimental setup](#11-experimental-setup)
-12. [Research & discussion](#12-research-discussion)
-13. [Training on a real dataset (MNIST)](#13-training)
-
----
-
-## 1. Background <a name="1-background"></a>
-
-### 1.1 What is a neural network?
-
-A neural network is a big mathematical function made of simple building
-blocks. Data flows in one side, and each block does a small piece of
-math — mostly **matrix multiplications** (multiplying grids of numbers)
-and element-wise operations — until a prediction comes out. The
-"learning" part of AI is finding good numbers (*weights*) inside those
-matrices.
-
-### 1.2 What is an LLM?
-
-An **LLM (Large Language Model)** — like GPT, LLaMA or Gemini — is a
-neural network specialised for text:
-
-- Text is chopped into **tokens** (word pieces); each token becomes a
-  list of numbers called a **vector / embedding**.
-- The heart of every LLM is the **Transformer block**, and the heart of
-  attention is: three matmuls to make **Q, K, V** projections, a score
-  matrix `Q·Kᵀ`, a **scale** (÷√d), a **softmax** (scores →
-  percentages), and a final matmul with V. That is "how much should I
-  care about each earlier token".
-- Each block also has a small **feed-forward network (FFN)** — two big
-  matmuls with a **GELU** activation between — plus **residual adds**
-  and **LayerNorm** (a stabiliser).
-- An LLM = many such blocks stacked (real models: 32–100+; our demo: 2)
-  with millions–billions of weights.
-
-### 1.3 Inference, and why it is slow and expensive
-
-**Training** builds the model once; **inference** is *using* it — every
-chat reply, every autocomplete. Inference is where the money goes:
-
-- An LLM is a **long chain of hundreds/thousands of small math
-  operations** that mostly must run in order.
-- On a GPU each operation is a **kernel** (a small program). Launching
-  one costs fixed overhead (~5–15 µs) even when the math is tiny —
-  hundreds of launches means lots of *waiting*, not computing.
-- Every operation writes its result to memory and the next one reads it
-  back. For small/medium models **moving data** costs more than the
-  math (GPUs are memory-bandwidth bound).
-- Real compilers therefore shrink the work: fewer, bigger kernels that
-  keep data in fast on-chip memory.
-
-### 1.4 What is a computation graph?
-
-Before a network runs, frameworks (PyTorch, TensorFlow, ONNX) represent
-it as a **computation graph**: a directed diagram where
-
-- **nodes = operations** ("multiply these matrices", "softmax this"),
-  and
-- **edges = tensor dependencies** ("that output feeds this node").
-
-Think of a recipe where every step is a box and arrows show which dish
-feeds which step. *Execution must respect the arrows*, but independent
-branches can run in parallel.
-
-### 1.5 What is a compiler, and why does an LLM need one?
-
-A compiler (like GCC for C) translates code to machine code and
-**optimises it** without changing what the program *does*. An ML
-compiler (XLA, TensorRT, TVM, MLGO…) does the same for computation
-graphs by running **passes** — each pass rewrites or analyses the graph:
-
-- **operator fusion** — merge 2–3 ops into one kernel so intermediates
-  never touch main memory;
-- **constant folding** — precompute what is already known;
-- **dead-code elimination (DCE)** — drop ops nobody uses;
-- **common-subexpression elimination (CSE)** — compute repeated things
-  once;
-- **scheduling** — order ops to hide latency; **partitioning** — split
-  a graph across GPUs.
-
-The golden rule: the optimised graph must compute **the same answers**
-— which is why we measure *accuracy preservation*.
-
-This project builds exactly such a compiler in miniature, so every idea
-is visible and measurable.
-
----
-
-## 2. What are we building? <a name="2-what-are-we-building"></a>
-
-**One sentence:** a working teaching compiler that takes a Transformer
-(LLM) computation graph, rewrites it through 6 classic optimisation
-passes plus 3 AI-guided search techniques, and proves the result with
-10 measured/modeled metrics — including proof that the optimised model
-still produces *identical* outputs.
-
-```
-original graph (42 ops)
- │ 1. Graph Normalization        canonicalize, fold constants, CSE, DCE, shapes
- │ 2. Attention Canonicalization  7 attention ops → 1 fused op
- │ 3. Semantic Operator Merging   MatMul+Add→GEMM, fusion chains
- │ 4. DAGS Scheduling             levels, critical path, execution order
- │ 5/6. Graph/Hypergraph Partitioning   split across devices
- │ 7. GNN scorer                  learns which graphs optimize well
- │ 8. RL pass-order search        learns which passes to use
- │ 9. Neuro-symbolic search       symbolic rules + learned guidance
- ▼
-optimised graph (14 ops) → executed & measured → 10-metric dashboard
-```
-
-Everything runs in pure Python/NumPy — no GPU or heavy framework
-needed — while real-GPU numbers are estimated with a documented cost
-model (see §6.3).
-
-![Compilation pipeline](docs/fig1_pipeline.png)
-
-*Figure 1 — The 9 techniques and where they sit in the pipeline. The
-first six rewrite/annotate the graph; the last three are the learned
-searches that can extend or replace fixed passes.*
-
----
-
-## 3. What is the input? <a name="3-inputs"></a>
-
-| Input | What it is | Where it comes from |
-|---|---|---|
-| **Model graph** | A 2-block (or 4-block) Transformer computation graph — 42 operations | Built by `models/transformer.py` (see §4) |
-| **Constants** | Positional-embedding table and a logit bias — real tensors stored in the IR | Generated deterministically in the model builder |
-| **Workload config** | `batch=4, seq=32, d_model=64` — tensor shapes for the executor and shape inference | `graph.meta["config"]` |
-| **User choices** | Which passes run, partitioning mode + count, RL / neuro-symbolic toggles | Streamlit sidebar / CLI |
-| **Weights** | Matrices inside matmuls | Derived deterministically from op names (fixed seed). In production these come from a real exported model (ONNX / Torch FX); the IR is designed so such an export could feed it. |
-
----
-
-## 4. How the original graph is formed <a name="4-original-graph"></a>
-
-`ir/graph.py` defines `ComputationGraph` — a wrapper around a NetworkX
-**directed acyclic graph (DAG)**. `add_operation(name, op_type, **attrs)`
-creates a node (attributes like `factor`, `value`, `is_output` travel
-with it); `add_dependency(a, b)` creates the arrow "a's tensor flows
-into b".
-
-`models/transformer.py` then builds a real Transformer, block by block.
-One block:
-
-```
-              source (previous block output)
-              ├──► Q_Projection (MatMul) ──┐
-              ├──► K_Projection (MatMul) ──┤
-              ├──► V_Projection (MatMul) ──┤
-              │                            ▼
-              │                     QK_Score (MatMul)
-              │                            ▼
-              │                      Scale (×1/√d)
-              │                            ▼
-              │                      Softmax
-              │                            ▼
-              └────────────────────► Attention_Output (MatMul)
-                                           ▼
-                   Residual_Add  ◄── (AV + source)
-                     ▼
-                   LayerNorm
-                     ▼
-        FFN_Linear → FFN_Bias → GELU → FFN_Output → FFN_Bias_Output
-                     ▼
-        FFN_Residual_Add → FFN_LayerNorm → Dropout (Identity)
-```
-
-Two blocks are chained, wrapped with an embedding add
-(`Input + positional constant`), a final `Logits` matmul + bias (marked
-as the **output** with `is_output=True`), and one deliberately **dead
-branch** (`Unused_Debug`) so the normalizer has real work to do.
-
-**Total: 42 operations, 50 dependencies.** The graph intentionally
-contains the classic patterns — a full attention block per layer,
-matmul + bias-add pairs, Add→LayerNorm pairs, Identity ops — so every
-compiler pass has something real to find.
-
-![Inside one Transformer block](docs/fig2_transformer_block.png)
-
-*Figure 2 — One Transformer block exactly as the model builder
-constructs it: attention (Q/K/V → QKᵀ → Scale → Softmax → AV) and the
-feed-forward network (Linear → GELU → Output → bias → residual).*
-
-### 4.1 The four architectures implemented
-
-`models/architectures.py` provides several architectures; **the same
-compiler pipeline and the same 10 metrics are applied to each**, which
-is the architecture-comparison experiment:
-
-| Architecture | Ops (orig → opt) | GRR | Fusions found | Modeled speedup | Accuracy |
-|---|---|---|---|---|---|
-| **Post-LN Transformer** (reference) | 42 → 14 | 66.7% | 2 attn + 11 merges | 1.73× | 100% |
-| **Pre-LN Transformer** (GPT-style) | 36 → 16 | 55.6% | 2 attn + 8 merges | 1.67× | 100% |
-| **Post-LN + ReLU FFN** | 42 → 14 | 66.7% | 2 attn + 11 merges | 1.74× | 100% |
-| **MLP classifier** (784-256-64-10) | 13 → 5 | 61.5% | 5 merges | 1.08× | 100% |
-
-The comparison itself is informative: **pre-LN fuses fewer ops** than
-post-LN (its residuals feed Adds directly, so the Add+LayerNorm fusion
-does not apply — exactly the pattern-dependence real compilers face),
-and the MLP has no attention to canonicalize.
-
-### 4.2 Mathematical formulation (the model, in equations)
-
-**Attention** (the core of every LLM block):
-
-$$\mathrm{Attention}(Q,K,V)=\mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V,
-\qquad Q=XW_Q,\; K=XW_K,\; V=XW_V$$
-
-**LayerNorm** (stabiliser between blocks):
-
-$$\mathrm{LN}(x)=\frac{x-\mu}{\sqrt{\sigma^{2}+\epsilon}}\odot\gamma+\beta,
-\qquad \mu=\frac{1}{d}\sum_{i=1}^{d}x_i,\;\; \sigma^2=\frac{1}{d}\sum_{i=1}^{d}(x_i-\mu)^2$$
-
-**Activations** (the non-linearity after each linear layer):
-
-$$\mathrm{GELU}(x)=0.5\,x\left[1+\tanh\!\left(\sqrt{2/\pi}\,(x+0.044715\,x^{3})\right)\right],
-\qquad \mathrm{ReLU}(x)=\max(0,x)$$
-
-**Feed-forward / dense layer** (what our **GEMM** fusion produces):
-
-$$Y = XW + b$$
-
-**Softmax + cross-entropy** (training objective for the classifier):
-
-$$\mathrm{softmax}(z)_i=\frac{e^{z_i}}{\sum_{j} e^{z_j}},
-\qquad \mathcal{L}=-\frac{1}{N}\sum_{n=1}^{N}\sum_{c=1}^{C} y_{n,c}\,\log\hat{y}_{n,c}$$
-
-**Backpropagation** (chain rule through a layer, ReLU derivative):
-
-$$\delta^{(l)}=\left(\delta^{(l+1)}W^{(l+1)\top}\right)\odot \mathbb{1}\!\left[z^{(l)}>0\right],
-\qquad \frac{\partial \mathcal{L}}{\partial W^{(l)}}=\delta^{(l+1)\top} a^{(l)}$$
-
-**Adam update** (the optimizer used for training):
-
-$$m_t=\beta_1 m_{t-1}+(1-\beta_1)g_t,\;\; v_t=\beta_2 v_{t-1}+(1-\beta_2)g_t^2,\;\;
-\theta \leftarrow \theta-\alpha\,\hat{m}_t/(\sqrt{\hat{v}_t}+\epsilon)$$
-
-**Compiler-side math**: sequential vs level-parallel latency (the DAGS
-cost model) and the GNN/Q-learning objectives:
-
-$$T_{\text{seq}}=\sum_{v\in G} t(v)+n\cdot t_{\text{launch}},
-\qquad T_{\text{par}}=\sum_{\ell}\max_{v\in\ell} t(v)+n\cdot t_{\text{launch}}$$
-
-$$H^{(l+1)}=\mathrm{ReLU}\!\left(H^{(l)}+\hat{A}H^{(l)}W^{(l)}\right),
-\quad \hat{A}=D^{-1/2}(A+I)D^{-1/2}$$
-
-$$Q(s,a)\leftarrow Q(s,a)+\alpha\left[r+\gamma\max_{a'}Q(s',a')-Q(s,a)\right]$$
-
----
-
-## 5. Methodology <a name="5-methodology"></a>
-
-Each subsection: what the technique is (with an analogy) → what our
-code actually does → what it changed on our graph.
-
-### 5.1 Graph Normalization (`passes/normalize.py`) — *tidy the workshop*
-
-Like a chef organising the kitchen before cooking. Six steps:
-
-1. **Canonicalization** — standardise names ("matmul"→"MatMul") so
-   later passes can rely on spelling.
-2. **Identity elimination** — `Identity(x) = x` ops (like our Dropout
-   placeholder) are rewired away: consumers read the producer's output
-   directly. *2 removed.*
-3. **Constant folding** — if an op's inputs are all constants, compute
-   it **at compile time** (`Scale(constant 0.5)` → a precomputed
-   constant). Fewer runtime ops, same result. *2 folded.*
-4. **CSE** — two ops computing the identical thing become one.
-   *Parameterised ops (MatMul — whose weights the signature can't see)
-   are excluded, otherwise Q/K/V projections would wrongly merge.*
-5. **DCE** — remove ops no output depends on (our dead debug branch and
-   the orphaned constant). *2 removed.*
-6. **Shape/dtype inference** — every node learns its tensor shape
-   (incl. the Q@Kᵀ rule → `(batch, seq, seq)`), like a type checker.
-
-**Result: 42 → 38 ops**, DAG preserved.
-
-### 5.2 Attention Graph Canonicalization (`passes/canonicalize.py`) —
-*the FlashAttention idea*
-
-Real runtimes (FlashAttention, `F.scaled_dot_product_attention`) execute
-the whole attention sandwich as **one** highly-optimised kernel. This
-pass **pattern-matches** the 7-node shape
-
-```
-Q,K,V (MatMul×3) → QKᵀ → Scale → Softmax → AV
-```
-
-with strict wiring checks (each node used only inside the pattern),
-then replaces it with a single **`FusedAttention`** operator. Provenance
-(`fused_from`) and the scale `factor` are carried into the fused node.
-
-![Attention graph canonicalization](docs/fig3_attention_fusion.png)
-
-*Figure 3 — The 7-op attention sandwich → one FlashAttention-style
-kernel. The scale factor and operator provenance travel with the fused
-node, so the executor rebuilds identical math.*
-
-**Result: 2 attention blocks found → 2 fused (ACR 100%), 26 ops.**
-
-### 5.3 Semantic Operator Merging (`passes/merge.py`) — *kernel fusion*
-
-The classic fusion table, applied to fixpoint:
-
-| Pattern | Fused kernel | Real-world analogue |
-|---|---|---|
-| MatMul + Add | **GEMM** | cuBLAS GEMM with bias |
-| GEMM/MatMul + GELU | **LinearGELU** | fused Linear+activation |
-| Add + LayerNorm | **FusedAddLayerNorm** | fused residual+norm |
-| Scale + Softmax | **FusedScaleSoftmax** | fused softmax path |
-
-Rules: the producer may have exactly one consumer, the consumer one
-producer — except GEMM may additionally **absorb a constant bias**
-(the constant's value becomes an attribute and the node disappears).
-Absorbed operators are recorded in `fused_from` so the executor can
-rebuild identical math.
-
-**Result: 11 fusions (GEMM×5, LinearGELU×2, FusedAddLayerNorm×4),
-26 → 14 ops.** Idempotent — running it again changes nothing.
-
-![Graph evolution through the pipeline](docs/fig5_stages.png)
-
-*Figure 4 — Operations remaining after each pipeline stage: 42 → 38 →
-26 → 14 (–66.7%).*
-
-### 5.4 Dependency-Aware Graph Scheduling — DAGS (`passes/schedule.py`)
-*the flight-control tower*
-
-Given the DAG, in what order should ops run, and what can run **in
-parallel**? DAGS computes:
-
-- **dependency levels** — an op's level = 1 + max level of its inputs
-  (like course prerequisites);
-- **critical path** — for each op, the longest weighted chain from it to
-  any output (the "longest queue" that decides minimum total time);
-- a deterministic **list schedule** — ops sorted by (level,
-  critical-path priority), annotated on every node as
-  `schedule_order` / `schedule_level`.
-
-Scheduling is *analysis*: it changes no nodes but everything downstream
-(parallel-latency estimates, buffer-reuse planning, partition
-colouring) uses it. On our graph: 14 ops → **11 levels**, avg
-parallelism ~1.3, and a modeled level-parallel makespan far below the
-sequential sum.
-
-### 5.5 Graph Partitioning (`passes/partition.py`) — *split across
-devices*
-
-Big models don't fit one GPU. Partitioning assigns each op a
-**partition id** (future device). Ours detects communities with
-**greedy modularity** (nodes that talk to each other belong together —
-like grouping friends), then forces exactly *k* parts by merging the
-smallest / splitting the largest communities (deterministic BFS
-bisection). Quality is reported as **cut edges** (dependencies crossing
-devices = slow communication) and a **balance ratio**. Structure is
-never mutated — it is pure annotation. On the 38-op graph (k=2):
-parts **[22, 16]**, only **2 cut edges**, balance 1.375.
-
-### 5.6 Hypergraph Partitioning (`passes/partition.py`) — *better cuts
-with group-wires*
-
-A normal edge connects 2 nodes, but one op feeding 4 consumers is
-really a **hyperedge** (a wire with many pins). Hypergraph mode builds
-nets from multi-input fan-in cones and multi-consumer fan-out sets,
-converts them to a weighted connection graph, partitions that, and
-reports **cut hyperedges** + **communication volume** (pins spread
-across devices). On the fused graph (k=2): **9 nets, 2 cut, comm 2**.
-
-### 5.7 Graph Neural Network scorer (`search/gnn.py`) — *a critic that
-has seen many graphs*
-
-A GNN learns from graph *shape*, not just single nodes. Our NumPy GNN:
-
-1. **Features** per node: one-hot op type (17 vocab) + 4 scalars
-   (log-degrees, is-fused flag, latency class) = 21 dims.
-2. **Message passing**: features propagate over the normalized
-   adjacency for 2 rounds (`H = relu(H + Â·H·W)`) — every node ends up
-   knowing about its neighbourhood.
-3. **Readout**: mean-pool all nodes → one graph embedding → a trained
-   **ridge-regression head** predicts *"how much speedup can the
-   optimizer extract from this graph?"*.
-
-Training: 36 synthetic DAGs (mixing attention motifs and random ops —
-labels = the cost-model speedup the pipeline actually achieves), each
-contributing **two samples** (unfused + fused, same label) so the head
-sees both worlds. Weights cached in `gnn_weights.npz`.
-
-### 5.8 Reinforcement Learning pass-order search (`search/rl.py`) —
-*learning which tools to use*
-
-RL = trial-and-error learning with rewards. Our environment:
-
-- **State**: which passes were applied so far (subset of
-  normalize/canonicalize/merge/schedule/partition).
-- **Action**: apply one remaining pass, or stop.
-- **Reward**: modeled speedup − 0.05 per pass used (rewards results,
-  discourages complexity).
-
-A tabular **Q-learning** agent runs ε-greedy episodes (80, ε 0.35→0.05,
-γ 0.9): every action's value `Q[state][action]` is nudged toward
-`reward + γ·max Q(next)`. Outcome on our model: it learns to recommend
-**normalize → canonicalize → merge** (reward **1.583**, 18 Q-states
-explored) — schedule/partition don't pay for their complexity cost on
-this small graph.
-
-### 5.9 Neuro-symbolic search (`search/neuro_symbolic.py`,
-`search/rewrites.py`) — *rules + intuition*
-
-Symbolic = explicit logic (rewrites like `Scale(Scale(x)) → Scale(x)`);
-neural = learned intuition. Five **rewrite rules** are defined
-(eliminate-identity, fold-constant, combine-nested-scales, CSE,
-fuse-matmul-add). Each search round: enumerate **all** rule matches,
-simulate each on a graph copy, score candidates with a **hybrid
-objective** (0.7 × deterministic cost model + 0.3 × GNN prediction −
-node-count penalty) and apply the best. This mirrors real learned
-compilers (MLGO/TASO): *the model proposes and ranks, the cost model
-validates*. Given the unfused canonical graph it applies **4 fusions
-(26 → 22 nodes)** and its outputs stay bit-exact.
-
-### 5.10 Pipeline order — why this sequence?
-
-```
-normalize → canonicalize → merge → neuro-symbolic → DAGS → partition
-```
-
-Normalize first (clean names/patterns); canonicalize **before** merge
-(else Scale+Softmax fusion would destroy the attention pattern);
-merge/NS before scheduling (fewer ops to schedule); schedule before
-partition (levels + partitions co-exist for the executor and visuals).
-
----
-
-## 6. How we measure: the 10 output metrics <a name="6-metrics"></a>
-
-Three sources of truth, kept deliberately separate:
-
-1. **Measured** — `utils/executor.py` actually *executes* both graphs
-   op-by-op in NumPy (batch 4, seq 32, d_model 64) with deterministic
-   per-op weights; fused operators rebuild the exact same math from
-   their `fused_from` provenance. Latency = best of 30 timed runs;
-   memory = tracked live-tensor liveness.
-2. **Modeled** — `utils/cost_model.py`, a documented A100-style cost
-   table (per-op latency/memory, 12 µs per kernel launch), a
-   level-parallel makespan from DAGS, and buffer-reuse memory
-   planning. Stands in for GPU numbers on this GPU-less machine.
-3. **Structural** — exact counts from the IR (nodes, launches,
-   fusions).
-
-| # | Metric | Beginner definition | Value on our demo |
-|---|---|---|---|
-| 1 | **Inference Latency** | Time for one forward pass | 0.566 → **0.477 ms** |
-| 2 | **Throughput** | Samples processed per second | 7068 → **8382 /s** |
-| 3 | **Speedup** | original latency ÷ optimized latency | **1.19× measured**, 1.73× modeled |
-| 4 | **Peak GPU Memory** | Most memory alive at any instant | 0.15 → **0.09 MB** measured; 2312 → **318 MB** modeled (buffer reuse) |
-| 5 | **Graph Reduction Ratio (GRR)** | Share of ops removed: (N₀−N₁)/N₀ | **66.7 %** (42→14) |
-| 6 | **Model Accuracy Preservation** | Does the optimized graph compute the same thing? (outputs compared element-wise) | **100 %** — bit-exact, max diff 0.0 |
-| 7 | **Operator Merge Ratio (OMR)** | Ops absorbed by fusion / original ops | **26.2 %** (11 fusions) |
-| 8 | **Attention Canonicalization Rate (ACR)** | Attention subgraphs rewritten / detected | **100 %** (2/2) |
-| 9 | **Kernel Launch Reduction** | Fewer launches = less overhead | **66.7 %** (42→14) |
-| 10 | **Compilation Time** | Wall time of the pass pipeline itself | **3.4 ms** (+ per-pass breakdown) |
-
-**The headline proof:** the fused 14-op graph produces *bit-identical*
-outputs to the original 42-op graph — optimization without breakage.
-
-### 6.1 The graphs, explained (a graph per metric family)
-
-**Latency / Throughput / Peak memory** (Figure 6, left three panels):
-paired bars for the original (gray) vs optimized (indigo) graph,
-measured by executing both graphs on the same machine. Latency drops
-because the fused graph dispatches 14 kernels instead of 42; throughput
-rises proportionally (it is batch ÷ latency); peak memory falls because
-fewer intermediate tensors are alive at once (liveness tracking).
-
-**Speedup** (Figure 6 + hero banner): the ratio of the two latencies —
-the single most quotable number. We report *measured* (NumPy proxy) and
-*modeled* (GPU cost model) side by side and never mix them.
-
-**Structural ratios** (Figure 8): GRR, OMR, ACR and kernel-launch
-reduction as horizontal bars. These are **exact counts** from the IR —
-GRR = (42−14)/42 = 66.7%, OMR = 11 fusions / 42 ops = 26.2%, ACR = 2/2
-attention blocks canonicalized = 100%, kernel-launch reduction = same
-arithmetic as GRR because every surviving op is one launch.
-
-**Compilation time** (Figure 7): per-pass wall time. The full pipeline
-compiles in ~3–5 ms, dominated by normalization and fusion; scheduling
-and partitioning are pure analysis and cost microseconds.
-
-**Graph evolution** (Figure 5 / fig5_stages.png): ops remaining after
-each stage (42 → 38 → 26 → 14) with the per-stage reduction — the
-"where did the work go" view.
-
-**Before/after graphs** (Figure 5 / fig4_graphs.png): the actual IR
-rendered before and after; fused kernels (FusedAttention, GEMM,
-LinearGELU, FusedAddLayerNorm) appear as bold single nodes.
-
-![Structural optimization ratios](docs/fig8_structural.png)
-
-*Figure 8 — The four structural ratio metrics as horizontal bars
-(GRR, OMR, ACR, kernel-launch reduction).*
-
-![Compilation time breakdown](docs/fig7_compile_time.png)
-
-*Figure 7 — Per-pass compilation time (metric 10): the entire compile
-costs only a few milliseconds.*
-
----
-
-## 7. Outputs — what you actually see <a name="7-outputs"></a>
-
-**Streamlit dashboard** (`app.py`): a gradient **hero banner** with the
-headline speedup and summary chips; three rows of **metric cards** with
-progress bars and colored status chips (Reduction & Fusion, Runtime,
-Accuracy & Compilation); a **Metric Summary table** (every metric,
-original → optimized → delta); an **operator-mix chart** (what fusion
-removed); side-by-side **original vs optimized graphs** (color-coded by
-op type, fused kernels bold, partition clusters and schedule order
-shown); and tabs for **Pass Details** (JSON log per pass), **DAGS
-Schedule** (execution-order table), **Partitions**, **Learned Search**
-(GNN prediction vs actual speedup, RL recommendation, rewrite log) and
-the full **CLI-style report**.
-
-![Original vs optimized computation graph](docs/fig4_graphs.png)
-
-*Figure 5 — Rendered straight from the IR: the 42-op input collapses to
-14 ops after canonicalization + fusion while computing bit-identical
-outputs.*
-
-![Output metrics — original vs optimized](docs/fig6_metrics.png)
-
-*Figure 6 — The headline measured and modeled metrics before/after:
-latency, throughput, peak memory, plus the structural ratios.*
-
-**CLI** (`main.py`): GNN prediction → RL search → compiles with the
-recommended pass order → prints the same 10-metric report:
-
-```
-=== RL pass-order search (tabular Q-learning) ===
-recommended pass sequence : normalize, canonicalize, merge
-best reward               : 1.583
-...
-Graph nodes            : 42 -> 14
-GRR  (graph reduction) :  66.67 %
-ACR  (attention canon.): 100.00 %
-Inference latency      :    0.566 ms ->    0.477 ms  (measured)
-Speedup                :  1.186 x  (measured) |  1.733 x  (modeled GPU)
-Accuracy preservation  : 100.00 %  (max |diff| = 0.000e+00)
-Compilation time       :     3.37 ms
-```
-
----
-
-## 8. Results summary <a name="8-results"></a>
-
-| Stage | Ops | What happened |
-|---|---|---|
-| Input model | 42 | 2 transformer blocks + embedding + logits + constants |
-| After normalization | 38 | −2 identities, 2 constants folded, dead branch removed, shapes inferred |
-| After attention canonicalization | 26 | 2 × (7 attention ops → 1 `FusedAttention`) |
-| After semantic merging | **14** | 11 fusions (GEMM, LinearGELU, FusedAddLayerNorm) + bias folded |
-| Scheduled & partitioned | 14 | 11 dependency levels; 2 partitions, 2 cut edges |
-| **Measured impact** | — | **~1.2× speedup, +18% throughput, −40% peak memory, bit-exact accuracy** |
-| **Modeled GPU impact** | — | **1.73× speedup, −86% memory** (level-parallel + buffer reuse) |
-| **Trained MNIST MLP** | 13 → 5 | trained to 96.75% test accuracy; compiled with 100% identical predictions |
-
-Every pass is idempotent and structure-safe; every rewrite is verified
-by executing both graphs and comparing outputs element-wise.
-
----
-
-## 9. Honest limitations <a name="9-limitations"></a>
-
-- The model is a **hand-built stand-in** (not an ONNX/PyTorch export);
-  weights are seeded, not trained.
-- **Measured numbers are CPU/NumPy proxies** for GPU inference — they
-  prove correctness and relative behaviour, not absolute GPU
-  milliseconds. Modeled numbers use a documented cost table.
-- The GNN surrogate is intentionally small (random-feature encoder +
-  ridge head, 72 samples) — it demonstrates the *mechanism* of learned
-  guidance rather than research-grade accuracy.
-- RL explores the 2⁵ pass subsets; larger action spaces would need
-  function approximation instead of a table.
-
----
-
-## 10. How to run it & project structure <a name="10-running"></a>
-
-```powershell
-.\run-server.bat                                          # UI (http://localhost:8501)
-.\.venv312\Scripts\python.exe main.py                     # CLI compile + metrics
-.\.venv312\Scripts\python.exe main.py --train             # MNIST train → export → compile
-.\.venv312\Scripts\python.exe make_figures.py             # regenerate docs/*.png
-```
-
-Or, without the batch file:
-
-```powershell
-python -m venv .venv312
-.\.venv312\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv312\Scripts\streamlit.exe run app.py --server.port 8501
-```
-
-### Figure index
-
-| Figure | File | Shows |
-|---|---|---|
-| Fig 1 | `docs/fig1_pipeline.png` | The full pipeline with all 9 techniques |
-| Fig 2 | `docs/fig2_transformer_block.png` | One Transformer block as the model builder constructs it |
-| Fig 3 | `docs/fig3_attention_fusion.png` | 7-op attention → one `FusedAttention` |
-| Fig 4 | `docs/fig5_stages.png` | Ops remaining after each stage (42→14) |
-| Fig 5 | `docs/fig4_graphs.png` | Original vs optimized graph, rendered from the IR |
-| Fig 6 | `docs/fig6_metrics.png` | Latency / throughput / memory before-after |
-| Fig 7 | `docs/fig7_compile_time.png` | Per-pass compilation time breakdown |
-| Fig 8 | `docs/fig8_structural.png` | GRR / OMR / ACR / kernel-launch bars |
-| Fig 9 | `docs/fig9_train_loss.png` | MNIST training/validation loss curves |
-| Fig 10 | `docs/fig10_train_accuracy.png` | MNIST training/validation accuracy curves |
-| Fig 11 | `docs/fig11_confusion.png` | MNIST confusion matrix |
-| Fig 12 | `docs/fig12_architectures.png` | Architecture comparison (ops + speedup) |
-
-Regenerate all figures with `python make_figures.py` (from the project root, venv active).
-
-| File | Role |
-|---|---|
-| `ir/graph.py` | ComputationGraph IR (nodes / edges / meta) |
-| `models/transformer.py` | post-LN demo transformer graph builder (the input) |
-| `models/architectures.py` | pre-LN (GPT-style), ReLU-FFN, MLP-classifier variants |
-| `passes/normalize.py` | canonicalization + folding + CSE + DCE + shapes |
-| `passes/canonicalize.py` | attention → `FusedAttention` |
-| `passes/merge.py` | semantic fusion (GEMM, LinearGELU, LinearRelu, …) |
-| `passes/schedule.py` | DAGS: levels, critical path, list schedule |
-| `passes/partition.py` | graph & hypergraph partitioning |
-| `search/gnn.py` | GNN speedup predictor (+ cached weights) |
-| `search/rl.py` | tabular Q-learning pass-order search |
-| `search/rewrites.py` | symbolic rewrite rules |
-| `search/neuro_symbolic.py` | rules + GNN-guided search |
-| `training/dataset.py` | MNIST download + IDX parse (+ synthetic fallback) |
-| `training/model.py` | NumPy MLP: forward, manual backprop, Adam |
-| `training/export_graph.py` | trained weights → CompilerGraph IR (the export) |
-| `training/train.py` | train → export → compile → verify loop |
-| `utils/executor.py` | NumPy reference executor (incl. trained weights) |
-| `utils/cost_model.py` | GPU-style cost tables |
-| `utils/metrics.py` | the 10 metrics + report formatter |
-| `utils/visualization.py` | colored Graphviz rendering |
-| `pipeline.py` | pass orchestration + compile timing |
-| `make_figures.py` | all 12 report figures (Pillow) |
-| `app.py` / `main.py` | Streamlit UI / CLI entry point |
-
----
-
-## 11. Experimental setup <a name="11-experimental-setup"></a>
-
-| Item | Value |
-|---|---|
-| **Hardware** | CPU-only workstation (no discrete GPU on the test machine) |
-| **OS / Python** | Windows · Python 3.12 (`.venv312`) |
-| **Libraries** | NumPy 2.5.2 · NetworkX 3.6.1 · Streamlit 1.62 · Pillow 12.3 (figures) |
-| **Workload (transformer)** | batch 4 · seq 32 · d_model 64 · 2 blocks · fp32 |
-| **Workload (classifier)** | MNIST 784-dim inputs · batch 256 · MLP 784-256-64-10 |
-| **Dataset** | MNIST (60k/10k images, flattened to 784, ÷255); subsets: 12 000 train / 2 000 test; deterministic subset selection (seed 0) |
-| **Training** | 6 epochs · mini-batch 64 · Adam (lr 2e-3, β₁ 0.9, β₂ 0.999) · He init (seed 0) |
-| **Measurement protocol** | 2 warm-up runs + 30 timed runs per graph; **best-of-30** latency (timeit-style steady-state estimator); identical input tensors for original & optimized graphs |
-| **Seeds** | everything deterministic: weights (crc32 of op names), data subsets (0), model init (0), RL (7), layouts (11) |
-| **Baselines** | the *uncompiled* original graph vs the *compiled* graph — same executor, same feed |
-| **Correctness check** | element-wise output comparison (rtol 1e-4, atol 1e-5) + argmax prediction match |
-
----
-
-## 12. Research & discussion <a name="12-research-discussion"></a>
-
-**Related systems.** The passes mirror production ML compilers:
-XLA and TensorRT fuse elementwise chains into GEMM-epilogues (our
-`LinearGELU`/`GEMM`), TVM's graph rewrites and TASO use
-verified rewrite rules (our symbolic `RULES`), FlashAttention/SDPA
-replaced the multi-op attention sandwich with one kernel (our
-`FusedAttention`), MLGO and todd networks learn pass policies with RL
-(our Q-learning pass-order search), and learned cost models
-(like TVM's) motivate our GNN scorer. The neuro-symbolic loop
-— *model proposes, cost model validates* — is the same architecture
-MLGO uses inside LLVM.
-
-**Findings.** (1) Fusion is by far the dominant optimization here:
-−66.7% ops and kernel launches translate into a measured 1.1–1.7×
-speedup on CPU and 1.73× on the modeled GPU. (2) **Architecture
-changes what the compiler can do**: pre-LN loses the Add+LayerNorm
-fusion (−3 fusions vs post-LN), showing that "how much can I fuse" is
-a property of the graph, not the compiler. (3) Constant folding, CSE
-and DCE are small but free wins, and dead branches/identity ops are
-more common in real exports than people expect. (4) The measured speedup
-is smaller than the modeled one because NumPy dispatch is cheap relative
-to a real GPU kernel launch (12 µs modeled per launch) — the *ratio*
-between structural reduction and runtime gain is the interesting
-research signal, and it is consistent across architectures.
-
-**Threats to validity.** Small fixed workloads; a cost table instead of
-real hardware timings; a tiny GNN corpus; one seed per experiment
-(all seeds fixed for reproducibility, but no confidence intervals).
-
-**Future work.** Import real ONNX exports; a Triton/CUDA backend so
-"modeled" becomes "measured"; beam search over rewrite sequences with
-the GNN as policy network; multi-device execution of partitions; larger
-RL action spaces (pass *parameters*, not just pass subsets).
-
----
-
-## 13. Training on a real dataset (MNIST) <a name="13-training"></a>
-
-The teacher's requirement *"train using the dataset"* is implemented as
-a full **train → export → compile → verify** loop (`training/`):
-
-1. **Dataset** — MNIST (28×28 grayscale digit images, flattened to
-   784-dim vectors, pixel values ÷255). Downloaded once from the
-   standard mirror; if offline, a deterministic synthetic fallback with
-   the same API is used. Subsets: 12 000 train / 2 000 test images.
-2. **Model** — an MLP classifier 784 → 256 → 64 → 10 (ReLU
-   activations, softmax output), implemented in **pure NumPy with
-   hand-written backpropagation** and an Adam optimizer.
-3. **Training** — 6 epochs, mini-batch 64: loss and accuracy curves in
-   Figures 9–10. Final **test accuracy ≈ 96.8%**.
-4. **Export** — the trained weights are written into the IR exactly
-   like a framework export: `MatMul` nodes carry the trained `W` as an
-   attribute, biases are `Constant` nodes feeding `Add` nodes
-   (`training/export_graph.py`).
-5. **Compile** — the exported 13-op graph runs through the pipeline:
-   3 × (MatMul+Add → GEMM), 2 × (GEMM+ReLU → LinearRelu) → **5 ops**.
-6. **Verify** — the compiled 5-op graph is executed on 512 real test
-   images: predictions match the trained model **100%** (bit-exact
-   probabilities), and inference is faster (measured 1.13×).
-
-![Training on MNIST — loss](docs/fig9_train_loss.png)
-
-*Figure 9 — Training and validation cross-entropy loss per epoch: both
-fall smoothly and stay close (no overfitting).*
-
-![Training on MNIST — accuracy](docs/fig10_train_accuracy.png)
-
-*Figure 10 — Training vs validation accuracy per epoch, ending at
-≈96.8% validation accuracy.*
-
-![Confusion matrix](docs/fig11_confusion.png)
-
-*Figure 11 — Confusion matrix on the 2 000-image test split: the
-diagonal dominates; the classic 4↔9 / 3↔5 confusions remain.*
-
-**Why this matters:** it closes the loop that real ML compilers close —
-*a model is trained in a framework, exported as a graph, optimized by
-the compiler, and the optimized artifact is verified against the
-trained model before deployment.* The UI exposes the same experiment
-(📈 training tab with the curves and the compiled-model comparison).
+The current `training/train_optimizer.py` command trains the experimental GNN on synthetic random DAGs with **modeled** speedup labels. It is for exercising the training code; it is not a PassNet training command and must not be described as a real-data model.
+
+## Training: current state and correct next step
+
+The current code has two distinct concerns:
+
+- `models/attention.py` plus FX tracing produce the computation DAG from a PyTorch model. This is deterministic model capture, not ML generation.
+- `search/gnn_torch.py` defines a small message-passing scorer, but its current `train()` function creates synthetic DAGs and labels them with the project's cost model. It is a prototype scorer and does not drive the dashboard's normalization/merge passes.
+
+For real training, first add a PassNet reader and a graph adapter, then execute this project's *actual* normalization and merge rules against compatible samples and collect correctness/performance labels on the intended hardware. Only after this dataset is available should the GNN be trained to predict optimization benefit. Training a predictor on artificial cost-model scores would merely teach it the same assumptions already encoded by that cost model.
+
+## Repository map
+
+| Path | Purpose |
+| --- | --- |
+| `frontend/src/App.jsx` | React dashboard, benchmark requests, metric charts, graph visualization, workbook download. |
+| `frontend/src/App.css` | Dashboard and scrollable DAG display styles. |
+| `api_server.py` | API for model graph optimization, sweeps, XLA, and report downloads. |
+| `ir/graph.py`, `ir/fx_graph.py` | Custom computation DAG and FX graph utilities. |
+| `models/attention.py` | PyTorch attention workload used for FX/XLA comparisons. |
+| `models/architectures.py`, `models/transformer.py` | Model-shaped custom IR example graphs. |
+| `passes/normalize.py` | Custom IR normalization. |
+| `passes/semantic_merge.py`, `passes/merge.py` | FX attention and custom IR semantic rewrites. |
+| `run_attention_optimization.py` | FX reference benchmark and workload sweep. |
+| `xla_compare.py` | Same-input PyTorch/JAX XLA comparison. |
+| `utils/metrics.py`, `utils/cost_model.py`, `utils/executor.py` | Metric definitions, labeled estimates, and NumPy reference executor. |
+| `training/`, `search/` | Earlier MLP/GNN/search experiments; not the active dashboard training loop. |
+| `tools/export_metrics.mjs` | Writes a workbook for each report request. |
+| `outputs/benchmark_reports/` | Generated run-specific `.xlsx` files (Git-ignored). |
+
+## Known limitations
+
+- PassNet is recommended but not downloaded, adapted, or used for training in this version.
+- The dashboard's measured attention runs are CPU reference measurements. GPU memory and launch counts are not measured by the current FX benchmark.
+- A semantic fused node is a graph rewrite description, not proof of a generated optimized kernel.
+- The XLA comparison is JAX/OpenXLA on CPU; device support and timings vary by installation and hardware.
+- The current custom IR executor and per-op GPU cost table are educational estimates, not a production compiler backend.
+- Graph normalization and semantic merging support selected ops/patterns. Unsupported ops should pass through unchanged or be rejected; never assume all PyTorch models are transformable.
+- A lower node count alone is not a performance result. Use repeated same-device measurements and correctness checks.
+
+## Sources
+
+- PassNet dataset card: https://huggingface.co/datasets/PassNet/PassNet
+- PassNet paper: https://arxiv.org/abs/2605.29357
+- PassNet implementation and benchmark: https://github.com/PaddlePaddle/PassNet
+- TorchBench: https://github.com/pytorch/benchmark
+- Google TPU Graphs: https://github.com/google-research-datasets/tpu_graphs
+- OpenXLA StableHLO overview: https://openxla.org/stablehlo
+- JAX installation support: https://docs.jax.dev/en/latest/installation.html
+- JAX JIT/compilation timing: https://docs.jax.dev/en/latest/jit-compilation.html
+
+## TODO — what is still missing
+
+This list separates the current demo from the work needed for a data-backed, input-derived LLM compiler experiment. The order is intentional: make the benchmark truthful and reproducible before using its results to train or claim an optimizer.
+
+### P0 — Make the current demo labels and graph behavior unambiguous
+
+- [ ] Change the `/api/models` catalog's four-block node count from the stale 78 to the 76 nodes actually built, or compute the count from the graph builder instead of storing it manually.
+- [ ] Change the MLP selector description so it does not say “trained on MNIST” until real MNIST examples and a trained checkpoint are loaded. Current graph weights are random.
+- [ ] Keep the custom-template graph metrics, FX attention measurements, XLA attention measurements, and modeled GPU estimates visibly separated in the UI and workbook.
+- [ ] Show actual selected model ID, graph input/configuration metadata, backend device, dtype, and successful/unavailable state with each exported comparison.
+- [ ] Remove the hidden `schedule_fx` metadata analysis from the active attention comparison or give it a clearly separate DAGS analysis panel, so the advertised active algorithm scope is exact.
+
+### P1 — Use a real model and real inputs
+
+- [ ] Select a small, licensed pretrained causal language model suitable for CPU development and document its exact checkpoint, tokenizer, license, and dependency versions.
+- [ ] Add a small text evaluation corpus such as WikiText-2, tokenize it using the model's tokenizer, and use deterministic held-out token sequences as real inputs. Do not commit model weights or a downloaded dataset unless their licenses and repository size make that appropriate.
+- [ ] Trace the selected supported PyTorch model with `torch.fx` and display the captured graph. Keep the hand-built templates only as explicitly labeled examples.
+- [ ] Apply normalization and semantic merging to graph patterns actually found in that trace. Preserve unsupported operations or reject unsupported graphs safely.
+- [ ] Check the model's output logits before and after each rewrite within numerical tolerances; also report a task-level measure such as held-out next-token loss/perplexity when the complete model path supports it.
+
+### P1 — Make the XLA comparison same-workload
+
+- [ ] Make XLA consume the same selected model subgraph, tensors, weights, dtype, and input token batch as the PyTorch path. The current XLA attention function is a separate equivalent equation, not the selected architecture DAG.
+- [ ] Record the JAX/XLA backend and device explicitly. Keep compile time separate from warmed steady-state latency and repeat measurements enough to report a median and spread.
+- [ ] Compare the same supported rewrite at the same scope. Do not compare StableHLO operation counts directly with FX/custom-IR node counts; they are different representations.
+- [ ] Run GPU comparisons only on available supported hardware and report measured GPU memory and launches only when the backend actually measures them.
+
+### P2 — Build real optimizer training data
+
+- [ ] Add a PassNet reader and license/provenance tracking. Filter to graphs and operations the project can capture and execute.
+- [ ] Generate labels by applying this project's legal normalization/merge candidates, checking numerical equivalence, and collecting repeated runtime measurements on the target device.
+- [ ] Split train/validation/test data by source model to avoid near-duplicate graphs leaking across splits.
+- [ ] Train the PyTorch GNN to rank legal rewrite candidates or predict measured benefit. Keep the rewrite itself rule-based and correctness-checked; do not let the model invent arbitrary graph code.
+- [ ] Evaluate on held-out models and publish correctness, latency, structural metrics, and model/data versions. Retire synthetic cost-model training labels from any claim of real-workload performance.
+
+### P2 — Make team setup reproducible
+
+- [ ] Replace machine-specific or Codex-only spreadsheet runtime wiring with a documented, installable dependency so XLSX export works in a fresh teammate checkout.
+- [ ] Add a clean setup check for supported Python, PyTorch, JAX CPU, Node.js, and npm versions; document optional CUDA setup separately.
+- [ ] Add automated checks for graph construction, supported normalization/merge rules, numerical equivalence, XLA-unavailable behavior, and workbook generation.
+- [ ] Define a reproducible benchmark protocol: hardware/software metadata, warmup, repeat count, input seeds, synchronization, and report schema.

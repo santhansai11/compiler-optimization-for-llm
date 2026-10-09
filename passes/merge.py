@@ -3,6 +3,8 @@
 import time
 from collections import Counter
 
+from passes.canonicalize import canonicalize_attention
+
 
 FUSION_PATTERNS = {
     ("MatMul", "Add"): "GEMM",
@@ -21,7 +23,8 @@ PROTECTED_OPS = {"Input", "Constant"}
 def merge_operators(graph):
     """Fuse producer/consumer operator pairs into single fused kernels.
 
-    Supported fusions (classic compiler patterns):
+    Supported semantic patterns:
+      * Q/K/V -> QK^T -> Scale -> Softmax -> AV -> FusedAttention
       * MatMul + Add         -> GEMM      (incl. constant-bias folding)
       * GEMM / MatMul + GELU -> LinearGELU
       * Add + LayerNorm      -> FusedAddLayerNorm
@@ -31,11 +34,15 @@ def merge_operators(graph):
     """
     started = time.perf_counter()
     optimized = graph.copy()
+    attention_before = optimized.node_count()
+    optimized, attention_info = canonicalize_attention(optimized)
     g = optimized.graph
 
     fused_types = Counter()
-    details = []
-    nodes_removed = 0
+    details = list(attention_info.get("details", []))
+    nodes_removed = attention_before - optimized.node_count()
+    if nodes_removed:
+        fused_types["FusedAttention"] += attention_info.get("canonicalized", 0)
     bias_folds = 0
 
     changed = True
@@ -82,6 +89,11 @@ def merge_operators(graph):
         "fused_types": dict(fused_types),
         "nodes_removed": nodes_removed,
         "bias_folds": bias_folds,
+        "attention_patterns_detected": attention_info.get("detected", 0),
+        "attention_patterns_merged": attention_info.get("canonicalized", 0),
+        "attention_canonicalization_rate": attention_info.get(
+            "attention_canonicalization_rate"
+        ),
         "details": details,
         "nodes_after": optimized.node_count(),
         "duration_s": time.perf_counter() - started,

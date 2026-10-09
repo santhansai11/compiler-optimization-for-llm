@@ -14,7 +14,7 @@ def _add_transformer_block(graph, prefix, source, d_model, act="gelu"):
     graph.add_operation(f"{p}_Q_Projection", "MatMul")
     graph.add_operation(f"{p}_K_Projection", "MatMul")
     graph.add_operation(f"{p}_V_Projection", "MatMul")
-    graph.add_operation(f"{p}_QK_Score", "MatMul")
+    graph.add_operation(f"{p}_QK_Score", "MatMul", transpose_rhs=True)
     graph.add_operation(f"{p}_Scale", "Scale", factor=scale_factor)
     graph.add_operation(f"{p}_Softmax", "Softmax")
     graph.add_operation(f"{p}_Attention_Output", "MatMul")

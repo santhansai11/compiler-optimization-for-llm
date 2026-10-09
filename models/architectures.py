@@ -43,7 +43,7 @@ def create_preln_transformer_graph(num_blocks=2, batch=4, seq=32,
         for role in ("Q", "K", "V"):
             graph.add_operation(f"{p}_{role}_Projection", "MatMul")
             graph.add_dependency(f"{p}_LN1", f"{p}_{role}_Projection")
-        graph.add_operation(f"{p}_QK_Score", "MatMul")
+        graph.add_operation(f"{p}_QK_Score", "MatMul", transpose_rhs=True)
         graph.add_dependency(f"{p}_Q_Projection", f"{p}_QK_Score")
         graph.add_dependency(f"{p}_K_Projection", f"{p}_QK_Score")
         graph.add_operation(f"{p}_Scale", "Scale", factor=scale_factor)
