@@ -267,9 +267,7 @@ def _infer_shapes(graph):
                 shape = tuple(value.shape)
         elif op_type in ("MatMul", "GEMM", "LinearGELU", "LinearRelu"):
             if shapes and all(s is not None for s in shapes):
-                shape = _matmul_output_shape(
-                    shapes, transpose_rhs=bool(data.get("transpose_rhs", False))
-                )
+                shape = _matmul_output_shape(shapes)
         elif op_type == "FusedAttention":
             if shapes and shapes[0] is not None:
                 shape = shapes[0]
@@ -285,7 +283,7 @@ def _infer_shapes(graph):
     return inferred
 
 
-def _matmul_output_shape(shapes, transpose_rhs=False):
+def _matmul_output_shape(shapes):
     """Order-independent matmul shape rule.
 
     Resolves operand orientation by inner-dim matching (a[-1] == b[-2]
@@ -296,8 +294,6 @@ def _matmul_output_shape(shapes, transpose_rhs=False):
     if len(shapes) < 2 or len(first) < 2 or len(second) < 2:
         return first[:-1] + (first[-1],)
     a, b = first, second
-    if transpose_rhs:
-        return a[:-1] + (b[-2],)
     if a[-1] == b[-2]:                       # a @ b
         return a[:-1] + (b[-1],)
     if b[-1] == a[-2]:                       # b @ a
@@ -305,56 +301,3 @@ def _matmul_output_shape(shapes, transpose_rhs=False):
     if a[-1] == b[-1] and a[-2] != b[-1]:    # a @ b^T (QK^T pattern)
         return a[:-2] + (a[-2], b[-2])
     return a[:-1] + (b[-1],)
-
-
-# ======================================================================
-# PyTorch FX Normalization (Identity rewrites x+0->x, x*1->x, and DCE)
-# ======================================================================
-
-def _fx_target_name(node):
-    target = node.target
-    if hasattr(target, "__name__"):
-        return target.__name__
-    return str(target)
-
-
-def _fx_is_constant(value, expected):
-    return isinstance(value, (int, float)) and value == expected
-
-
-def normalize_fx(graph_module):
-    """Normalize a PyTorch FX GraphModule by eliminating identities and dead code."""
-    graph = graph_module.graph
-    for node in list(graph.nodes):
-        if node.op != "call_function":
-            continue
-        name = _fx_target_name(node)
-        if name == "add":
-            a, b = node.args
-            if _fx_is_constant(a, 0.0):
-                node.replace_all_uses_with(b)
-                graph.erase_node(node)
-            elif _fx_is_constant(b, 0.0):
-                node.replace_all_uses_with(a)
-                graph.erase_node(node)
-        elif name == "mul":
-            a, b = node.args
-            if _fx_is_constant(a, 1.0):
-                node.replace_all_uses_with(b)
-                graph.erase_node(node)
-            elif _fx_is_constant(b, 1.0):
-                node.replace_all_uses_with(a)
-                graph.erase_node(node)
-
-    graph.eliminate_dead_code()
-    graph.lint()
-    graph_module.recompile()
-    return graph_module
-
-
-def normalize(target):
-    """Polymorphic normalizer supporting both ComputationGraph and torch.fx GraphModule."""
-    if isinstance(target, ComputationGraph):
-        return normalize_graph(target)
-    return normalize_fx(target)
-

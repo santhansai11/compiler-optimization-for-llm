@@ -809,10 +809,9 @@ with g2:
     )
 
 # --------------------------------------------------------------------- tabs
-tab_details, tab_sched, tab_part, tab_learn, tab_train, tab_report, tab_fx = st.tabs(
+tab_details, tab_sched, tab_part, tab_learn, tab_train, tab_report = st.tabs(
     ["🧾 Pass Details", "🗓️ DAGS Schedule", "🧱 Partitions",
-     "🧠 Learned Search", "🏋️ Training (MNIST)", "📋 Full Report",
-     "⚡ PyTorch FX Attention"]
+     "🧠 Learned Search", "🏋️ Training (MNIST)", "📋 Full Report"]
 )
 
 with tab_details:
@@ -958,58 +957,6 @@ with tab_train:
 
 with tab_report:
     st.code(format_report(metrics), language="text")
-
-with tab_fx:
-    st.markdown("### ⚡ PyTorch FX Attention Semantic Merging")
-    st.caption("Model graph extraction via torch.fx, identity normalization (x+0->x, x*1->x), and semantic attention merging into fused_attention.")
-
-    import os
-    fx_c1, fx_c2 = st.columns(2)
-    with fx_c1:
-        st.subheader("Original FX Graph")
-        if os.path.exists("original_graph.png"):
-            st.image("original_graph.png", use_container_width=True)
-        else:
-            st.info("original_graph.png not found")
-    with fx_c2:
-        st.subheader("Semantically Merged Graph")
-        if os.path.exists("optimized_graph.png"):
-            st.image("optimized_graph.png", use_container_width=True)
-        else:
-            st.info("optimized_graph.png not found")
-
-    st.divider()
-    st.subheader("📊 Multi-Workload Attention Benchmark Sweep")
-    st.caption("Benchmarking AttentionModel across diverse batch sizes, sequence lengths, and hidden dimensions.")
-
-    fx_benchmark_btn = st.button("▶️ Run Multi-Workload FX Benchmark Sweep", key="btn_fx_bench")
-    if fx_benchmark_btn:
-        with st.spinner("Benchmarking 13 workload combinations across PyTorch FX..."):
-            from run_attention_optimization import run_case
-            cases = [
-                (1, 32, 64), (2, 64, 64), (4, 128, 64), (8, 256, 64), (16, 512, 64),
-                (2, 64, 128), (4, 128, 128), (8, 256, 128),
-                (2, 64, 256), (4, 128, 256), (8, 256, 256),
-                (2, 128, 512), (4, 256, 512),
-            ]
-            results = []
-            for b, s, d in cases:
-                res = run_case(b, s, d)
-                results.append({
-                    "Batch": res["batch"],
-                    "Seq": res["seq"],
-                    "d_model": res["d_model"],
-                    "Nodes": f"{res['original_nodes']} -> {res['optimized_nodes']}",
-                    "GRR": f"{res['grr']:.2f}%",
-                    "Orig (ms)": f"{res['original_latency']:.4f}",
-                    "Opt (ms)": f"{res['optimized_latency']:.4f}",
-                    "Speedup": f"{res['speedup']:.3f}x",
-                    "Throughput Opt (tok/s)": f"{res['throughput_optimized']:,.0f}",
-                    "Max Error": f"{res['max_error']:.2e}",
-                    "Correct": "✅" if res["correct"] else "❌",
-                })
-            st.dataframe(pd.DataFrame(results), use_container_width=True, hide_index=True)
-
 
 st.divider()
 st.caption(

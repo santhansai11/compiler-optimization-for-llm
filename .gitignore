@@ -11,7 +11,5 @@ __pycache__/
 *.npz
 training/data/
 training/artifacts/
-outputs/benchmark_reports/
-tools/node_modules/
 .DS_Store
 Thumbs.db

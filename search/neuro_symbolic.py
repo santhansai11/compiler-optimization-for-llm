@@ -10,7 +10,7 @@ compilers: the model proposes and ranks, the cost model validates.
 
 import time
 
-from search.gnn_torch import load_or_train
+from search.gnn import load_or_train
 from search.rewrites import RULES
 from utils.cost_model import sequential_latency_us
 

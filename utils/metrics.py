@@ -27,24 +27,16 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
     )
 
     merge_info = pass_infos.get("semantic_merging", {}) or {}
-    attention_info = (
-        pass_infos.get("attention_canonicalization")
-        or merge_info
-        or {}
-    )
+    attention_info = pass_infos.get("attention_canonicalization", {}) or {}
 
     operator_merge_ratio = (
         merge_info.get("nodes_removed", 0) / nodes_original
         if nodes_original
         else 0.0
     )
-    detected = attention_info.get(
-        "detected", attention_info.get("attention_patterns_detected", 0)
-    )
-    canonicalized = attention_info.get(
-        "canonicalized", attention_info.get("attention_patterns_merged", 0)
-    )
-    acr = canonicalized / detected if detected else None
+    detected = attention_info.get("detected", 0)
+    canonicalized = attention_info.get("canonicalized", 0)
+    acr = canonicalized / detected if detected else 0.0
 
     launches_original = kernel_launches(original_graph)
     launches_optimized = kernel_launches(optimized_graph)
@@ -187,10 +179,8 @@ def format_report(metrics):
         f"{metrics['graph_reduction_ratio'] * 100:6.2f} %",
         f"OMR  (operator merge)  : "
         f"{metrics['operator_merge_ratio'] * 100:6.2f} %",
-        ("ACR  (attention canon.): "
-         + (f"{metrics['attention_canonicalization_rate'] * 100:6.2f} %"
-            if metrics["attention_canonicalization_rate"] is not None
-            else "N/A (pass disabled)")),
+        f"ACR  (attention canon.): "
+        f"{metrics['attention_canonicalization_rate'] * 100:6.2f} %",
         f"Kernel launch reduct.  : "
         f"{metrics['kernel_launch_reduction'] * 100:6.2f} %",
         "",

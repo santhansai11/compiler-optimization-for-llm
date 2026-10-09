@@ -174,8 +174,7 @@ def _compute(name, data, ins, feed):
     if op == "GELU":
         return _gelu(ins[0])
     if op == "MatMul":
-        return _matmul(ins, base, weight,
-                       transpose_rhs=bool(data.get("transpose_rhs", False)))
+        return _matmul(ins, base, weight)
     if op == "GEMM":
         return (_matmul(ins[:1], base, weight)
                 + _bias(data, ins)).astype(np.float32)
@@ -206,7 +205,7 @@ def _bias(data, ins):
     return np.float32(0.0)
 
 
-def _matmul(ins, base, weight=None, transpose_rhs=False):
+def _matmul(ins, base, weight=None):
     """MatMul with orientation resolution.
 
     Single input -> x @ W, where ``W`` is the node's stored ``weight``
@@ -223,8 +222,6 @@ def _matmul(ins, base, weight=None, transpose_rhs=False):
             W = np.asarray(weight, dtype=np.float32)
         return (x @ W).astype(np.float32)
     a, b = ins[0], ins[1]
-    if transpose_rhs:
-        return (a @ np.swapaxes(b, -1, -2)).astype(np.float32)
     if a.ndim >= 2 and b.ndim >= 2:
         if a.shape[-1] == b.shape[-2]:
             return (a @ b).astype(np.float32)
