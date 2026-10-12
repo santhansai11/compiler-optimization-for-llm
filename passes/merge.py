@@ -14,6 +14,8 @@ FUSION_PATTERNS = {
     ("MatMul", "Relu"): "LinearRelu",
     ("Add", "LayerNorm"): "FusedAddLayerNorm",
     ("Scale", "Softmax"): "FusedScaleSoftmax",
+    ("MatMul", "SiLU"): "LinearSiLU",
+    ("Add", "RMSNorm"): "FusedAddRMSNorm",
 }
 
 BIAS_FUSION_PAIR = ("MatMul", "Add")
@@ -29,6 +31,8 @@ def merge_operators(graph):
       * GEMM / MatMul + GELU -> LinearGELU
       * Add + LayerNorm      -> FusedAddLayerNorm
       * Scale + Softmax      -> FusedScaleSoftmax
+      * MatMul + SiLU        -> LinearSiLU        (SwiGLU gate)
+      * Add + RMSNorm        -> FusedAddRMSNorm   (LLaMA residual)
 
     Returns ``(graph, info)``; ``info['nodes_removed']`` feeds OMR.
     """

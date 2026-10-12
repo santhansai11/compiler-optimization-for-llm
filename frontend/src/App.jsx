@@ -153,7 +153,12 @@ function App() {
   const [xlaError, setXlaError] = useState('')
   const [loading, setLoading] = useState(false)
   const [sweeping, setSweeping] = useState(false)
-  const [passes] = useState({ normalize: true, merge: true })
+  const [passes, setPasses] = useState({ normalize: true, canonicalize: true, merge: true, schedule: true, partition: false })
+  const [partitionMode, setPartitionMode] = useState('graph')
+  const [numPartitions, setNumPartitions] = useState(2)
+  const [archs, setArchs] = useState(null)
+  const [ablation, setAblation] = useState(null)
+  const [busy, setBusy] = useState('')
 
   useEffect(() => {
     api('status').then(() => setHealth('online')).catch(() => setHealth('offline'))
@@ -184,13 +189,16 @@ function App() {
     setXlaError('')
     setXla(null)
     setSweep(null)
+    setArchs(null)
+    setAblation(null)
     setReport(null)
     setActiveTab('overview')
     const payload = {
       model_id: modelId,
       ...workload,
-      passes: { ...passes, partition: false },
-      partition_mode: 'Off',
+      passes,
+      partition_mode: partitionMode,
+      num_partitions: Number(numPartitions),
     }
     try {
       const response = await api('optimize', payload)
@@ -205,7 +213,7 @@ function App() {
       }
       try {
         const saved = await api('export_report', {
-          kind: 'attention_pytorch_xla_comparison', model_id: 'AttentionModel', device: 'CPU', workload,
+          kind: 'compiler_comparison', model_id: modelId, model_name: response.model_name, passes, device: 'CPU', workload,
           warmup_runs: 4, timed_runs: 20, compiler_metrics: response.metrics, stages: response.stages,
           pass_info: response.pass_info, xla: backendResult,
         })
@@ -219,6 +227,24 @@ function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function loadArchitectures() {
+    setBusy('archs'); setError('')
+    try { setArchs(await api('architectures', { ...workload, passes })) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  async function loadAblation() {
+    setBusy('ablation'); setError('')
+    try { setAblation(await api('ablation', { ...workload, model_id: modelId })) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  async function exportArchitectures() {
+    if (!archs) return
+    try {
+      const saved = await api('export_report', { kind: 'architecture_comparison', passes, device: 'CPU', workload, architectures: archs.rows })
+      setReport(saved)
+    } catch (e) { setError(e.message) }
   }
 
   async function runSweep(full = false) {
@@ -264,8 +290,8 @@ function App() {
         <section className="hero-panel">
           <div className="hero-copy"><div className="hero-kicker"><span className="pulse-dot" /> COMPILER WORKBENCH <span className="hero-version">v2.1</span></div>
             <h1>Make every operation<br /><span>earn its place.</span></h1>
-            <p>Build a model’s computation DAG, normalize it, merge recognized operators, and compare the same workload with XLA.</p>
-            <div className="hero-chips"><span><Workflow size={14} /> DAG construction</span><span><Layers3 size={14} /> Graph normalization</span><span><ChartNoAxesColumn size={14} /> Semantic merge</span><span><Cpu size={14} /> XLA benchmark</span></div>
+            <p>Build a model’s computation DAG, then apply normalization, attention canonicalization, semantic merging, DAGS scheduling and partitioning — and compare against XLA.</p>
+            <div className="hero-chips"><span><Workflow size={14} /> DAG construction</span><span><Layers3 size={14} /> Normalization</span><span><Braces size={14} /> Attention canonicalization</span><span><ChartNoAxesColumn size={14} /> Semantic merge</span><span><Boxes size={14} /> DAGS + partitioning</span><span><Cpu size={14} /> XLA benchmark</span></div>
           </div>
           <div className="hero-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit orbit-three" /><div className="hero-core"><Zap size={34} /></div><span className="orbit-node node-a">matmul</span><span className="orbit-node node-b">softmax</span><span className="orbit-node node-c">fused</span><span className="orbit-node node-d">normalize</span><div className="hero-art-caption">GRAPH → OPTIMIZE → MEASURE</div></div>
         </section>
@@ -279,15 +305,18 @@ function App() {
           <button className="btn-primary run-btn" onClick={runOptimization} disabled={loading || health === 'offline'}>{loading ? <RefreshCw size={17} className="spin" /> : <Play size={16} fill="currentColor" />}{loading ? 'Running…' : 'Run comparison'}</button>
         </section>
 
-        <section className="passes-row"><span className="passes-label">ACTIVE PASSES</span><span className="pass-chip selected"><span className="pass-check"><Check size={11} /></span>DAG construction</span><span className="pass-chip selected"><span className="pass-check"><Check size={11} /></span>Graph normalization</span><span className="pass-chip selected"><span className="pass-check"><Check size={11} /></span>Semantic operator merging</span><span className="passes-note">Same workload · same weights · CPU reference</span></section>
+        <section className="passes-row"><span className="passes-label">PASSES</span>
+          {[['normalize', 'Graph normalization'], ['canonicalize', 'Attention canonicalization'], ['merge', 'Semantic operator merging'], ['schedule', 'DAGS scheduling'], ['partition', 'Graph partitioning']].map(([key, label]) => <button type="button" key={key} className={`pass-chip ${passes[key] ? 'selected' : ''}`} aria-pressed={passes[key]} onClick={() => setPasses((value) => ({ ...value, [key]: !value[key] }))}><span className="pass-check">{passes[key] && <Check size={11} />}</span>{label}</button>)}
+          {passes.partition && <span className="partition-opts"><select aria-label="Partition mode" value={partitionMode} onChange={(event) => setPartitionMode(event.target.value)}><option value="graph">Graph cut</option><option value="hypergraph">Hypergraph</option></select><input aria-label="Partitions" type="number" min="2" max="8" value={numPartitions} onChange={(event) => setNumPartitions(event.target.value)} /></span>}
+          <span className="passes-note">Toggle passes, then run · same weights · CPU reference</span></section>
 
-        {health === 'offline' && <div className="notice notice-error"><CircleAlert size={17} /> Backend API is offline. Start the Python API and React development server with <code>run-server.bat</code>.</div>}
+        {health === 'offline' && <div className="notice notice-error"><CircleAlert size={17} /> Backend API is offline. Start the Python API and React development server with <code>./run.sh</code> (macOS/Linux) or <code>run-server.bat</code> (Windows).</div>}
         {error && <div className="notice notice-error"><CircleAlert size={17} />{error}</div>}
 
         {result && <>
           <nav className="tabs-nav" aria-label="Dashboard sections">
             {[
-              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
+              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
             ].map(([id, label, Icon]) => <button key={id} className={`tab-btn ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id)}><Icon size={16} />{label}{id === 'xla' && xla?.all_correct && <span className="tab-check"><Check size={11} /></span>}</button>)}
             {report && <a className="download-btn" href={report.download_url}><Download size={15} /> Download XLSX</a>}
           </nav>
@@ -295,12 +324,16 @@ function App() {
           {activeTab === 'overview' && <div className="dashboard animate-fade">
             <div className="result-strip"><span className="result-dot" /> LAST RUN <b>{result.original_graph?.nodes?.length || counts?.nodes_original || 0} → {counts?.nodes_optimized || 0} IR nodes</b><span className="result-sep">·</span>batch {workload.batch} / seq {workload.seq} / d {workload.d_model}<span className="result-spacer" />{metrics.accuracy.preserved ? <span className="accuracy-tag"><Check size={13} /> outputs preserved</span> : <span className="accuracy-tag bad"><CircleAlert size={13} /> output changed</span>}</div>
             <div className="metrics-grid">
-              <MetricCard label="Graph reduction" value={`${(metrics.graph_reduction_ratio * 100).toFixed(1)}%`} foot={`${counts.nodes_original} → ${counts.nodes_optimized} nodes`} icon={GitBranch} />
-              <MetricCard label="Measured speedup" value={`${speedup.toFixed(2)}×`} foot="NumPy reference executor" icon={Gauge} tone="purple" />
+              <MetricCard label="Inference latency" value={`${metrics.latency_ms.optimized.toFixed(3)} ms`} foot={`was ${metrics.latency_ms.original.toFixed(3)} ms · measured`} icon={Gauge} />
+              <MetricCard label="Throughput" value={`${Math.round(metrics.throughput.optimized).toLocaleString()} /s`} foot={`was ${Math.round(metrics.throughput.original).toLocaleString()} samples/s`} icon={Activity} tone="purple" />
+              <MetricCard label="Speedup" value={`${speedup.toFixed(2)}×`} foot={`measured · ${metrics.modeled.speedup.toFixed(2)}× modeled GPU`} icon={ArrowUpRight} tone="cyan" />
+              <MetricCard label="Peak GPU memory" value={`${metrics.modeled.memory_optimized_mb.toFixed(0)} MB`} foot={`was ${metrics.modeled.memory_original_mb.toFixed(0)} MB · modeled`} icon={Boxes} tone="amber" />
+              <MetricCard label="Graph reduction · GRR" value={`${(metrics.graph_reduction_ratio * 100).toFixed(1)}%`} foot={`${counts.nodes_original} → ${counts.nodes_optimized} nodes`} icon={GitBranch} />
               <MetricCard label="Accuracy preserved" value={metrics.accuracy.preserved ? '100%' : 'Mismatch'} foot={`max error ${metrics.accuracy.max_abs_diff.toExponential(1)}`} icon={Check} tone={metrics.accuracy.preserved ? 'green' : 'amber'} />
-              <MetricCard label="Kernel reduction" value={`${(metrics.kernel_launch_reduction * 100).toFixed(1)}%`} foot={`${counts.kernel_launches_original} → ${counts.kernel_launches_optimized} launches`} icon={Boxes} tone="cyan" />
-              <MetricCard label="Modeled GPU speedup" value={`${metrics.modeled.speedup.toFixed(2)}×`} foot="Cost model estimate · not measured GPU" icon={ArrowUpRight} tone="amber" />
-              <MetricCard label="Compile time" value={`${(metrics.compilation_time_s * 1000).toFixed(1)} ms`} foot={`${Object.keys(metrics.pass_durations_s || {}).length} passes`} icon={Activity} />
+              <MetricCard label="Operator merge · OMR" value={`${(metrics.operator_merge_ratio * 100).toFixed(1)}%`} foot="nodes removed by merging" icon={Layers3} tone="purple" />
+              <MetricCard label="Attention canon. · ACR" value={metrics.attention_canonicalization_rate == null ? 'N/A' : `${(metrics.attention_canonicalization_rate * 100).toFixed(0)}%`} foot={`${metrics.attention_subgraphs.canonicalized}/${metrics.attention_subgraphs.detected} patterns`} icon={Braces} tone="cyan" />
+              <MetricCard label="Kernel launch reduction" value={`${(metrics.kernel_launch_reduction * 100).toFixed(1)}%`} foot={`${counts.kernel_launches_original} → ${counts.kernel_launches_optimized} launches`} icon={Zap} tone="green" />
+              <MetricCard label="Compilation time" value={`${(metrics.compilation_time_s * 1000).toFixed(1)} ms`} foot={`${Object.keys(metrics.pass_durations_s || {}).length} stages`} icon={Cpu} />
             </div>
             <div className="charts-grid">
               <Panel title="Graph size through the pipeline" eyebrow="NORMALIZATION + FUSION" icon={GitBranch}><BarChart rows={graphSteps.map((step, index) => ({ label: step.stage, value: step.ops, tone: index === graphSteps.length - 1 ? 'tone-purple' : '', detail: `${step.ops} operations` }))} unit=" ops" precision={0} /></Panel>
@@ -329,6 +362,38 @@ function App() {
             <Panel title="Original computation DAG" eyebrow="BEFORE PASSES" icon={Workflow}><GraphView graph={result.original_graph} title="Original IR" /></Panel>
             <Panel title="Optimized computation DAG" eyebrow="AFTER SELECTED PASSES" icon={Workflow}><GraphView graph={result.optimized_graph} title="Optimized IR" optimized /></Panel>
             <Panel title="Pass-by-pass node count" eyebrow="NORMALIZATION OUTPUT INCLUDED" icon={Layers3}><BarChart rows={graphSteps.map((step, index) => ({ label: step.stage, value: step.ops, tone: index === graphSteps.length - 1 ? 'tone-purple' : '' }))} unit=" ops" precision={0} /></Panel>
+          </div>}
+
+          {activeTab === 'archs' && <div className="dashboard animate-fade">
+            <div className="section-intro"><div><div className="eyebrow">SAME PASSES · EVERY ARCHITECTURE</div><h2>How do the architectures compare?</h2><p>Runs the currently selected passes on each model graph and reports the ten output metrics side by side.</p></div><div className="sweep-actions"><button className="btn-secondary" onClick={loadArchitectures} disabled={busy === 'archs'}>{busy === 'archs' ? <RefreshCw size={15} className="spin" /> : <Boxes size={15} />}{busy === 'archs' ? 'Running…' : 'Compare architectures'}</button>{archs && <button className="btn-secondary" onClick={exportArchitectures}><Download size={15} /> Export XLSX</button>}</div></div>
+            {archs ? <>
+              <div className="charts-grid">
+                <Panel title="Graph reduction ratio" eyebrow="GRR % · STRUCTURAL" icon={GitBranch}><BarChart rows={archs.rows.map((row) => ({ label: row.name, value: row.grr, tone: 'tone-purple', detail: `${row.nodes_original} → ${row.nodes_optimized} nodes` }))} unit="%" /></Panel>
+                <Panel title="Modeled GPU speedup" eyebrow="COST MODEL · NOT MEASURED GPU" icon={ArrowUpRight}><BarChart rows={archs.rows.map((row) => ({ label: row.name, value: row.modeled_speedup, tone: 'tone-cyan', detail: `${row.speedup.toFixed(2)}× measured on NumPy` }))} unit="×" /></Panel>
+                <Panel title="Kernel launch reduction" eyebrow="PROXY · %" icon={Zap}><BarChart rows={archs.rows.map((row) => ({ label: row.name, value: row.klr, tone: 'tone-green' }))} unit="%" /></Panel>
+                <Panel title="Peak GPU memory (modeled)" eyebrow="MB · OPTIMIZED" icon={Boxes}><BarChart rows={archs.rows.map((row) => ({ label: row.name, value: row.gpu_memory_optimized_mb, tone: 'tone-purple', detail: `was ${row.gpu_memory_original_mb.toFixed(0)} MB` }))} unit=" MB" precision={0} /></Panel>
+              </div>
+              <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Architecture</th><th>Nodes</th><th>GRR</th><th>OMR</th><th>ACR</th><th>Launch red.</th><th>Latency (ms)</th><th>Speedup</th><th>Throughput</th><th>Compile</th><th>Accuracy</th></tr></thead><tbody>{archs.rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.nodes_original} → {row.nodes_optimized}</td><td>{row.grr.toFixed(1)}%</td><td>{row.omr.toFixed(1)}%</td><td>{row.acr == null ? 'N/A' : `${row.acr.toFixed(0)}%`}</td><td>{row.klr.toFixed(1)}%</td><td>{row.latency_original_ms.toFixed(3)} → {row.latency_optimized_ms.toFixed(3)}</td><td>{row.speedup.toFixed(2)}× / {row.modeled_speedup.toFixed(2)}×</td><td>{Math.round(row.throughput_optimized).toLocaleString()}/s</td><td>{row.compile_ms.toFixed(1)} ms</td><td className={row.accuracy_preserved ? 'correct-cell' : 'incorrect-cell'}>{row.accuracy_preserved ? 'PASS' : 'CHECK'}</td></tr>)}</tbody></table></div></div>
+              <div className="metric-note"><Braces size={15} /> Speedup column: measured NumPy reference / modeled GPU cost table. Small measured differences are within timing noise; the modeled column reflects removed kernels and memory traffic.</div>
+            </> : <div className="panel xla-empty"><div className="empty-icon"><Boxes size={22} /></div><h3>Compare every architecture</h3><p>Post-LN, Pre-LN, ReLU, LLaMA-style and MLP graphs go through the same compiler passes.</p></div>}
+          </div>}
+
+          {activeTab === 'ablation' && <div className="dashboard animate-fade">
+            <div className="section-intro"><div><div className="eyebrow">WHICH PASS GIVES WHAT?</div><h2>Pass ablation for {result.model_name}</h2><p>Each pass alone, then in combination, on the selected model. Shows where graph reduction and modeled speedup actually come from.</p></div><div className="sweep-actions"><button className="btn-secondary" onClick={loadAblation} disabled={busy === 'ablation'}>{busy === 'ablation' ? <RefreshCw size={15} className="spin" /> : <Layers3 size={15} />}{busy === 'ablation' ? 'Running…' : 'Run ablation'}</button></div></div>
+            {ablation ? <>
+              <div className="charts-grid">
+                <Panel title="Nodes remaining" eyebrow="LOWER IS BETTER" icon={GitBranch}><BarChart rows={ablation.rows.map((row) => ({ label: row.name, value: row.nodes_optimized, tone: 'tone-purple', detail: `GRR ${row.grr.toFixed(1)}%` }))} unit=" ops" precision={0} /></Panel>
+                <Panel title="Modeled GPU speedup" eyebrow="COST MODEL" icon={ArrowUpRight}><BarChart rows={ablation.rows.map((row) => ({ label: row.name, value: row.modeled_speedup, tone: 'tone-cyan' }))} unit="×" /></Panel>
+              </div>
+              <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Configuration</th><th>Nodes</th><th>GRR</th><th>OMR</th><th>Launch red.</th><th>Modeled speedup</th><th>GPU memory</th><th>Accuracy</th></tr></thead><tbody>{ablation.rows.map((row) => <tr key={row.name}><td>{row.name}</td><td>{row.nodes_original} → {row.nodes_optimized}</td><td>{row.grr.toFixed(1)}%</td><td>{row.omr.toFixed(1)}%</td><td>{row.klr.toFixed(1)}%</td><td>{row.modeled_speedup.toFixed(2)}×</td><td>{row.gpu_memory_optimized_mb.toFixed(0)} MB</td><td className={row.accuracy_preserved ? 'correct-cell' : 'incorrect-cell'}>{row.accuracy_preserved ? 'PASS' : 'CHECK'}</td></tr>)}</tbody></table></div></div>
+            </> : <div className="panel xla-empty"><div className="empty-icon"><Layers3 size={22} /></div><h3>Run the ablation</h3><p>Compare each pass in isolation against the full pipeline.</p></div>}
+          </div>}
+
+          {activeTab === 'diagrams' && <div className="dashboard animate-fade">
+            <div className="section-intro"><div><div className="eyebrow">ARCHITECTURE &amp; BLOCK DIAGRAMS</div><h2>How the compiler is organised</h2><p>System architecture, pass pipeline, transformer block before/after fusion, and per-pass rewrites. The same figures are used in the project report.</p></div></div>
+            <div className="diagram-grid">{[
+              ['fig_system_architecture', 'System architecture'], ['fig_block_diagram', 'Block diagram of the compiler passes'], ['fig_attention_fusion', 'Attention canonicalization (before / after)'], ['fig_transpose_algebra', 'Normalization: transpose algebra'], ['fig_dags_schedule', 'DAGS level schedule'], ['fig_partitioning', 'Graph / hypergraph partitioning'], ['fig_architectures', 'Supported model architectures'],
+            ].map(([file, title]) => <figure className="panel diagram-card" key={file}><figcaption>{title}</figcaption><img src={`/diagrams/${file}.png`} alt={title} loading="lazy" /></figure>)}</div>
           </div>}
 
           {activeTab === 'xla' && <div className="dashboard animate-fade">
@@ -368,7 +433,7 @@ function App() {
           </div>}
         </>}
 
-        {!result && <section className="empty-workspace panel"><span className="empty-icon"><Workflow size={24} /></span><div className="eyebrow">READY WHEN YOU ARE</div><h2>Choose a model and run the compiler</h2><p>The dashboard will show graph normalization, semantic merging, before/after DAGs, and an XLA comparison for the attention workload.</p><button className="btn-primary" onClick={runOptimization} disabled={loading || health === 'offline'}>{loading ? <RefreshCw size={17} className="spin" /> : <Play size={16} fill="currentColor" />}{loading ? 'Running comparison…' : 'Run first comparison'}</button></section>}
+        {!result && <section className="empty-workspace panel"><span className="empty-icon"><Workflow size={24} /></span><div className="eyebrow">READY WHEN YOU ARE</div><h2>Choose a model and run the compiler</h2><p>The dashboard shows all ten output metrics, before/after DAGs, architecture comparison, pass ablation, diagrams, and an XLA comparison.</p><button className="btn-primary" onClick={runOptimization} disabled={loading || health === 'offline'}>{loading ? <RefreshCw size={17} className="spin" /> : <Play size={16} fill="currentColor" />}{loading ? 'Running comparison…' : 'Run first comparison'}</button></section>}
 
         <footer className="footer"><span><Zap size={13} /> GraphForge · compiler research UI</span><span>Reference executor metrics and hardware/compiler benchmarks are reported separately.</span></footer>
       </main>

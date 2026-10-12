@@ -79,3 +79,12 @@ button { color: inherit; }
 .spin { animation: spin 1s linear infinite; }@keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1000px) { .hero-art { flex-basis: 265px; transform: scale(.86); transform-origin: center right; margin-left: -35px; }.control-row { flex-wrap: wrap; align-items: end; }.control-title { min-width: calc(100% - 15px); }.model-field { flex-basis: 40%; }.passes-note { width: 100%; margin: 2px 0 0 53px; }.metrics-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 680px) { .topbar { height: 58px; padding: 0 15px; }.topbar-caption, .topbar-divider { display: none; }.page { padding: 14px 12px 25px; }.hero-panel { padding: 26px 22px; min-height: 0; }.hero-art { display: none; }.hero-copy h1 { font-size: 2.5rem; }.hero-copy > p { font-size: .85rem; }.control-row { gap: 10px; padding: 15px; }.model-field { min-width: 100%; flex-basis: 100%; }.field { flex: 1; min-width: 65px; }.field input { width: 100%; }.run-btn { width: 100%; }.passes-label { width: 100%; }.passes-note { margin-left: 0; }.tabs-nav { overflow-x: auto; }.tab-btn { padding: 10px 8px; font-size: .69rem; }.tab-btn svg { display: none; }.download-btn { padding: 7px; }.download-btn svg { display: none; }.result-strip { font-size: .64rem; }.result-spacer { display: none; }.metrics-grid, .charts-grid, .sweep-summary { grid-template-columns: 1fr; }.metric-card { min-height: 112px; }.section-intro { align-items: start; flex-direction: column; }.benchmark-state { align-self: start; }.footer { flex-direction: column; }.graph-grid > .panel { min-height: unset; }.sweep-actions { flex-wrap: wrap; } }
+
+.partition-opts{display:inline-flex;gap:6px;align-items:center}
+.partition-opts select,.partition-opts input{background:var(--panel-2,#161a2b);color:inherit;border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:5px 8px;font:inherit;font-size:12px}
+.partition-opts input{width:52px}
+button.pass-chip{cursor:pointer;font-family:inherit}
+.diagram-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:16px}
+.diagram-card{margin:0;padding:14px}
+.diagram-card figcaption{font-weight:600;margin-bottom:10px}
+.diagram-card img{width:100%;height:auto;border-radius:8px;background:#fff}

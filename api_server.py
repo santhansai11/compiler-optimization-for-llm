@@ -21,7 +21,6 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 REPORTS_DIR = PROJECT_ROOT / "outputs" / "benchmark_reports"
-REPORT_BUILDER = PROJECT_ROOT / "tools" / "export_metrics.mjs"
 
 from ir.graph import ComputationGraph
 from models.transformer import create_demo_transformer_graph
@@ -29,8 +28,11 @@ from models.architectures import (
     create_postln_transformer_graph,
     create_preln_transformer_graph,
     create_relu_transformer_graph,
+    create_llama_style_graph,
     create_mlp_classifier_graph,
 )
+from models.operations import OPERATION_DEMOS
+from utils.reports import write_report
 from pipeline import run_pipeline
 from passes.normalize import normalize as normalize_fx
 from passes.semantic_merge import semantic_merge_attention
@@ -45,6 +47,101 @@ from utils.cost_model import (
     kernel_launches,
 )
 from utils.executor import execute
+
+
+# id -> (display name, builder(batch, seq, d_model), description)
+MODEL_REGISTRY = {
+    "postln_2b": ("Post-LN Transformer (2 blocks)",
+                  lambda b, s, d: create_postln_transformer_graph(2, b, s, d),
+                  "Reference Vaswani et al. architecture"),
+    "postln_4b": ("Post-LN Transformer (4 blocks)",
+                  lambda b, s, d: create_postln_transformer_graph(4, b, s, d),
+                  "Deeper 4-block transformer DAG"),
+    "preln_2b": ("Pre-LN Transformer (GPT-2 style)",
+                 lambda b, s, d: create_preln_transformer_graph(2, b, s, d),
+                 "LayerNorm inside the residual branches"),
+    "relu_2b": ("Post-LN + ReLU FFN",
+                lambda b, s, d: create_relu_transformer_graph(2, b, s, d),
+                "Exercises the LinearRelu fusion pathway"),
+    "llama_2b": ("LLaMA-style (RMSNorm + SwiGLU)",
+                 lambda b, s, d: create_llama_style_graph(2, b, s, d),
+                 "RMSNorm, gated SwiGLU feed-forward, no biases"),
+    "mlp_classifier": ("MLP classifier (784-256-64-10)",
+                       lambda b, s, d: create_mlp_classifier_graph(batch=256),
+                       "Plain feed-forward network (random weights)"),
+}
+for _id, (_name, _builder, _desc) in OPERATION_DEMOS.items():
+    MODEL_REGISTRY[_id] = (_name, (lambda f: lambda b, s, d: f(b, s, d))(_builder), _desc)
+
+DEFAULT_PASSES = {"normalize": True, "canonicalize": True, "merge": True,
+                  "schedule": True, "partition": False}
+STAGE_ORDER = [
+    ("normalize", "Graph normalization"),
+    ("canonicalize", "Attention canonicalization"),
+    ("merge", "Semantic operator merging"),
+    ("schedule", "DAGS scheduling"),
+    ("partition", "Graph partitioning"),
+]
+
+
+def _passes_from(data):
+    flags = dict(DEFAULT_PASSES)
+    flags.update({k: bool(v) for k, v in (data.get("passes") or {}).items()
+                  if k in flags})
+    return flags
+
+
+def _run(graph, flags, num_partitions=2, hypergraph=False):
+    return run_pipeline(
+        graph, normalize=flags["normalize"], canonicalize=flags["canonicalize"],
+        merge=flags["merge"], schedule=flags["schedule"],
+        partition=flags["partition"], hypergraph=hypergraph,
+        num_partitions=num_partitions)
+
+
+def _stage_table(graph, flags, num_partitions, hypergraph):
+    """Cumulative per-pass table: nodes, launches and modeled latency."""
+    rows = [{"stage": "Original graph", "ops": graph.node_count(),
+             "launches": kernel_launches(graph),
+             "modeled_latency_us": sequential_latency_us(graph)}]
+    enabled = {k: False for k in flags}
+    for key, label in STAGE_ORDER:
+        if not flags[key]:
+            continue
+        enabled[key] = True
+        g, _, _ = _run(graph, enabled, num_partitions, hypergraph)
+        rows.append({"stage": f"+ {label}", "ops": g.node_count(),
+                     "launches": kernel_launches(g),
+                     "modeled_latency_us": scheduled_latency_us(g)})
+    return rows
+
+
+def _architecture_row(name, graph, flags, num_partitions, hypergraph, batch):
+    opt, infos, ctime = _run(graph, flags, num_partitions, hypergraph)
+    m = compute_metrics(graph, opt, infos, ctime, batch_size=batch)
+    acr = m["attention_canonicalization_rate"]
+    return {
+        "name": name,
+        "nodes_original": m["counts"]["nodes_original"],
+        "nodes_optimized": m["counts"]["nodes_optimized"],
+        "grr": m["graph_reduction_ratio"] * 100,
+        "omr": m["operator_merge_ratio"] * 100,
+        "acr": None if acr is None else acr * 100,
+        "klr": m["kernel_launch_reduction"] * 100,
+        "latency_original_ms": m["latency_ms"]["original"],
+        "latency_optimized_ms": m["latency_ms"]["optimized"],
+        "speedup": m["speedup"],
+        "modeled_speedup": m["modeled"]["speedup"],
+        "throughput_original": m["throughput"]["original"],
+        "throughput_optimized": m["throughput"]["optimized"],
+        "memory_original_mb": m["peak_memory_mb"]["original"],
+        "memory_optimized_mb": m["peak_memory_mb"]["optimized"],
+        "gpu_memory_original_mb": m["modeled"]["memory_original_mb"],
+        "gpu_memory_optimized_mb": m["modeled"]["memory_optimized_mb"],
+        "accuracy_preserved": m["accuracy"]["preserved"],
+        "max_abs_diff": m["accuracy"]["max_abs_diff"],
+        "compile_ms": m["compilation_time_s"] * 1e3,
+    }
 
 
 def _json_safe(obj):
@@ -114,14 +211,12 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
         if path == "/api/status":
             self._send_json({"status": "ready", "engine": "LLM Compiler Optimizer v2.0", "target": "React Web App"})
         elif path == "/api/models":
-            models = [
-                {"id": "postln_2b", "name": "Post-LN Transformer (2 blocks)", "ops": 42, "desc": "Reference Vaswani et al. architecture"},
-                {"id": "postln_4b", "name": "Post-LN Transformer (4 blocks)", "ops": 78, "desc": "Deeper 4-block transformer DAG"},
-                {"id": "preln_2b", "name": "Pre-LN Transformer (GPT/LLaMA)", "ops": 36, "desc": "LayerNorm placed inside residual branches"},
-                {"id": "relu_2b", "name": "Post-LN + ReLU FFN", "ops": 42, "desc": "Exercises LinearRelu fusion pathway"},
-                {"id": "mlp_classifier", "name": "MLP Classifier (784-256-64-10)", "ops": 13, "desc": "Feedforward classifier trained on MNIST"},
-            ]
-            self._send_json({"models": models})
+            models = []
+            for model_id, (name, builder, desc) in MODEL_REGISTRY.items():
+                models.append({"id": model_id, "name": name, "desc": desc,
+                               "ops": builder(4, 32, 64).node_count()})
+            self._send_json({"models": models, "passes": [
+                {"id": k, "label": label} for k, label in STAGE_ORDER]})
         else:
             self._send_json({"error": "Endpoint not found"}, status=404)
 
@@ -145,62 +240,76 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             self.handle_fx_attention(data)
         elif path == "/api/xla_benchmark":
             self.handle_xla_benchmark(data)
+        elif path == "/api/architectures":
+            self.handle_architecture_comparison(data)
+        elif path == "/api/ablation":
+            self.handle_ablation(data)
         elif path == "/api/export_report":
             self.handle_export_report(data)
         else:
             self._send_json({"error": "Unknown POST endpoint"}, status=404)
 
     def _get_model_graph(self, model_id, batch=4, seq=32, d_model=64):
-        if model_id == "postln_4b":
-            return create_demo_transformer_graph(num_blocks=4, batch=batch, seq=seq, d_model=d_model)
-        elif model_id == "preln_2b":
-            return create_preln_transformer_graph(num_blocks=2, batch=batch, seq=seq, d_model=d_model)
-        elif model_id == "relu_2b":
-            return create_relu_transformer_graph(num_blocks=2, batch=batch, seq=seq, d_model=d_model)
-        elif model_id == "mlp_classifier":
-            return create_mlp_classifier_graph(batch=256)
-        else:
-            return create_demo_transformer_graph(num_blocks=2, batch=batch, seq=seq, d_model=d_model)
+        entry = MODEL_REGISTRY.get(model_id) or MODEL_REGISTRY["postln_2b"]
+        return entry[1](batch, seq, d_model)
 
     def handle_optimize(self, data):
         model_id = data.get("model_id", "postln_2b")
-        # Keep this experiment scoped to graph normalization and semantic merging.
-        passes = data.get("passes", {"normalize": True, "merge": True})
-
+        flags = _passes_from(data)
+        num_partitions = max(2, min(8, int(data.get("num_partitions", 2))))
+        hypergraph = data.get("partition_mode", "graph") == "hypergraph"
         batch = int(data.get("batch", 4))
         seq = int(data.get("seq", 32))
         d_model = int(data.get("d_model", 64))
 
         orig_graph = self._get_model_graph(model_id, batch=batch, seq=seq, d_model=d_model)
-
-        opt_graph, infos, compile_time_s = run_pipeline(
-            orig_graph,
-            normalize=passes.get("normalize", True),
-            canonicalize=False,
-            merge=passes.get("merge", True),
-            schedule=False,
-            partition=False,
-        )
-
+        opt_graph, infos, compile_time_s = _run(orig_graph, flags, num_partitions, hypergraph)
         metrics = compute_metrics(orig_graph, opt_graph, infos, compile_time_s, batch_size=batch)
 
-        # Stage progression counts
-        stages = [
-            {"stage": "Original Graph", "ops": orig_graph.node_count()},
-            {"stage": "After Normalization", "ops": infos.get("normalize", {}).get("nodes_after", orig_graph.node_count())},
-            {"stage": "After Semantic Operator Merging", "ops": infos.get("semantic_merging", {}).get("nodes_after", opt_graph.node_count())},
-        ]
-
-        response = {
+        self._send_json({
+            "model_id": model_id,
+            "model_name": MODEL_REGISTRY.get(model_id, MODEL_REGISTRY["postln_2b"])[0],
+            "passes": flags,
             "original_graph": graph_to_d3(orig_graph),
             "optimized_graph": graph_to_d3(opt_graph),
             "metrics": metrics,
-            "stages": stages,
+            "stages": _stage_table(orig_graph, flags, num_partitions, hypergraph),
             "pass_info": infos,
             "schedule_info": opt_graph.meta.get("schedule", {}),
             "partition_info": opt_graph.meta.get("partition", {}),
-        }
-        self._send_json(response)
+        })
+
+    def handle_architecture_comparison(self, data):
+        """Run the same pass selection on every registered architecture."""
+        flags = _passes_from(data)
+        batch = int(data.get("batch", 4))
+        seq = int(data.get("seq", 32))
+        d_model = int(data.get("d_model", 64))
+        rows = []
+        for model_id, (name, builder, _) in MODEL_REGISTRY.items():
+            if model_id.startswith("op_"):
+                continue
+            rows.append({"id": model_id, **_architecture_row(
+                name, builder(batch, seq, d_model), flags, 2, False, batch)})
+        self._send_json({"rows": rows, "passes": flags})
+
+    def handle_ablation(self, data):
+        """Each pass alone, then all together: attributes the gains."""
+        model_id = data.get("model_id", "postln_2b")
+        batch = int(data.get("batch", 4))
+        seq = int(data.get("seq", 32))
+        d_model = int(data.get("d_model", 64))
+        graph = self._get_model_graph(model_id, batch, seq, d_model)
+        none = {k: False for k in DEFAULT_PASSES}
+        configs = [("Baseline (no passes)", none)]
+        for key, label in STAGE_ORDER:
+            configs.append((f"{label} only", {**none, key: True}))
+        configs.append(("Normalize + Canonicalize", {**none, "normalize": True, "canonicalize": True}))
+        configs.append(("Normalize + Merge", {**none, "normalize": True, "merge": True}))
+        configs.append(("All passes", {**DEFAULT_PASSES, "partition": True}))
+        rows = [_architecture_row(label, graph, flags, 2, False, batch)
+                for label, flags in configs]
+        self._send_json({"model_id": model_id, "rows": rows})
 
     def handle_export_report(self, data):
         """Create a distinct Excel workbook for a completed UI comparison."""
@@ -208,50 +317,17 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
         created = datetime.now(timezone.utc)
         run_id = f"{created.strftime('%Y%m%dT%H%M%S_%fZ')}_{uuid4().hex[:8]}"
         filename = f"metrics_{run_id}.xlsx"
-        report = {
-            **data,
-            "run_id": run_id,
-            "created_utc": created.isoformat(timespec="seconds"),
-        }
-        node = shutil.which("node")
-        if not node:
-            candidates = [
-                Path.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies" / "node" / "bin" / "node.exe",
-            ]
-            node_path = next((candidate for candidate in candidates if candidate.exists()), None)
-            node = str(node_path) if node_path else None
-        if not node or not REPORT_BUILDER.exists():
-            self._send_json({"error": "Excel export runtime is unavailable; install Node.js to generate .xlsx reports."}, status=503)
-            return
+        report = {**data, "run_id": run_id,
+                  "created_utc": created.isoformat(timespec="seconds")}
         try:
-            exported = subprocess.run(
-                [node, str(REPORT_BUILDER), str(REPORTS_DIR / filename)],
-                input=json.dumps(report, default=_json_safe),
-                text=True,
-                capture_output=True,
-                cwd=str(REPORT_BUILDER.parent),
-                timeout=45,
-                check=True,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
+            write_report(REPORTS_DIR / filename, _json_safe(report))
+        except Exception as exc:  # report generation must not crash the API
             self._send_json({"error": f"Could not create Excel report: {exc}"}, status=500)
             return
-        # artifact-tool writes an inspection sidecar for desktop review; the
-        # application only needs the portable workbook in its reports folder.
-        sidecar = Path(str(REPORTS_DIR / filename) + ".inspect.ndjson")
-        sidecar.unlink(missing_ok=True)
-        sheets = ["Summary"]
-        if report.get("xla"):
-            sheets.append("XLA")
-        if report.get("sweep", {}).get("results"):
-            sheets.append("Workload sweep")
-        if report.get("stages"):
-            sheets.append("Graph stages")
         self._send_json({
             "run_id": run_id,
             "filename": filename,
             "download_url": f"/reports/{filename}",
-            "sheets": sheets,
         })
 
     def handle_report_download(self, filename):

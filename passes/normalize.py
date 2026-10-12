@@ -40,6 +40,10 @@ OP_TYPE_MAP = {
     "maskedfill": "MaskedFill",
     "broadcast": "Broadcast",
     "cast": "Cast",
+    "rmsnorm": "RMSNorm",
+    "silu": "SiLU",
+    "linearsilu": "LinearSiLU",
+    "fusedaddrmsnorm": "FusedAddRMSNorm",
 }
 
 FOLDABLE_OPS = {"Scale", "Add", "Mul", "Sub", "MatMul"}
@@ -48,7 +52,7 @@ COMMUTATIVE_OPS = {"Add", "Mul"}
 # (op_type, inputs) signature cannot capture must never be CSE'd - Q/K/V
 # projections share inputs but must stay distinct.
 PARAMETERIZED_OPS = {"MatMul", "GEMM", "LinearGELU", "LinearRelu",
-                     "FusedAttention", "Gather"}
+                     "LinearSiLU", "FusedAttention", "Gather"}
 
 # Semantic attributes that make two otherwise-identical signatures
 # distinct (two LayerNorms share inputs but have different gamma/beta;
@@ -80,6 +84,7 @@ def _semantic_sig(data):
 ELEMENTWISE_OPS = {
     "Add", "Mul", "Sub", "Scale", "Softmax", "LayerNorm", "GELU",
     "Relu", "Identity", "FusedAddLayerNorm", "FusedScaleSoftmax",
+    "RMSNorm", "SiLU", "FusedAddRMSNorm",
 }
 
 
@@ -96,6 +101,9 @@ def normalize_graph(graph):
         "pass": "normalize",
         "renamed": 0,
         "identities_removed": 0,
+        "transposes_removed": 0,
+        "transposes_folded": 0,
+        "scales_merged": 0,
         "constants_folded": 0,
         "cse_merges": 0,
         "dead_nodes_removed": 0,
@@ -119,6 +127,9 @@ def normalize_graph(graph):
 
     # Step 2-6: structural cleanups and analysis.
     info["identities_removed"] = _remove_identities(normalized)
+    (info["transposes_removed"],
+     info["transposes_folded"]) = _simplify_transposes(normalized)
+    info["scales_merged"] = _merge_scale_chains(normalized)
     info["constants_folded"] = _fold_constants(normalized)
     info["cse_merges"] = _eliminate_common_subexpressions(normalized)
     info["dead_nodes_removed"] = _eliminate_dead_code(normalized)
@@ -149,6 +160,152 @@ def _remove_identities(graph):
         graph.graph.remove_node(node)
         removed += 1
     return removed
+
+
+def _perm_of(data, ndim=None):
+    """Permutation of a Transpose node (``None`` = reverse all axes)."""
+    dims = data.get("dims")
+    return None if dims is None else tuple(int(d) for d in dims)
+
+
+def _is_last_two_swap(perm):
+    """True for (..., n-1, n-2) permutations, i.e. a matrix transpose."""
+    if perm is None or len(perm) < 2:
+        return False
+    n = len(perm)
+    return perm == tuple(range(n - 2)) + (n - 1, n - 2)
+
+
+def _replace_input(g, node, old, new):
+    """Swap one predecessor of ``node`` while keeping operand order.
+
+    MatMul operand roles (lhs/rhs) are encoded by the order of the
+    in-edges, so a plain remove+add (which appends) would swap them.
+    """
+    preds = list(g.predecessors(node))
+    attrs = {p: dict(g.edges[p, node]) for p in preds}
+    for p in preds:
+        g.remove_edge(p, node)
+    for p in preds:
+        if p == old:
+            g.add_edge(new, node)
+        elif not g.has_edge(p, node):
+            g.add_edge(p, node, **attrs[p])
+
+
+def _simplify_transposes(graph):
+    """Transpose algebra: (A^T)^T -> A and MatMul(A, B^T) -> MatMul^T(A, B).
+
+    * Double transpose: two back-to-back transposes whose permutations
+      cancel are removed, deleting two memory-copy kernels.
+    * Transpose folding: a matrix transpose feeding the right operand of a
+      MatMul is absorbed into the MatMul (``transpose_rhs``) because the
+      GEMM kernel can read the operand in transposed layout for free.
+
+    Returns ``(double_transposes_removed, transposes_folded)``.
+    """
+    g = graph.graph
+    removed = folded = 0
+
+    changed = True
+    while changed:
+        changed = False
+        for node in list(g.nodes()):
+            data = g.nodes[node]
+            if data.get("op_type") != "Transpose" or data.get("is_output"):
+                continue
+            preds = list(g.predecessors(node))
+            if len(preds) != 1:
+                continue
+            inner = preds[0]
+            inner_data = g.nodes[inner]
+            if inner_data.get("op_type") != "Transpose":
+                continue
+            p_in, p_out = _perm_of(inner_data), _perm_of(data)
+            if p_in is None and p_out is None:
+                cancels = True
+            elif p_in is not None and p_out is not None \
+                    and len(p_in) == len(p_out):
+                cancels = all(p_in[p_out[i]] == i for i in range(len(p_in)))
+            else:
+                cancels = False
+            if not cancels:
+                continue
+            sources = list(g.predecessors(inner))
+            if len(sources) != 1:
+                continue
+            source = sources[0]
+            consumers = list(g.successors(node))
+            if any(g.has_edge(source, succ) for succ in consumers):
+                continue  # would create a parallel edge
+            for succ in consumers:
+                _replace_input(g, succ, node, source)
+            g.remove_node(node)
+            removed += 1
+            if g.out_degree(inner) == 0 and not inner_data.get("is_output"):
+                g.remove_node(inner)
+                removed += 1
+            changed = True
+            break
+
+    changed = True
+    while changed:
+        changed = False
+        for node in list(g.nodes()):
+            data = g.nodes[node]
+            if data.get("op_type") != "MatMul" or data.get("transpose_rhs"):
+                continue
+            preds = list(g.predecessors(node))
+            if len(preds) != 2:
+                continue
+            rhs = preds[1]
+            rhs_data = g.nodes[rhs]
+            if rhs_data.get("op_type") != "Transpose" \
+                    or g.out_degree(rhs) != 1 or rhs_data.get("is_output"):
+                continue
+            sources = list(g.predecessors(rhs))
+            if len(sources) != 1 or not _is_last_two_swap(_perm_of(rhs_data)):
+                continue
+            if g.has_edge(sources[0], node):
+                continue
+            _replace_input(g, node, rhs, sources[0])
+            g.remove_node(rhs)
+            data["transpose_rhs"] = True
+            folded += 1
+            changed = True
+            break
+    return removed, folded
+
+
+def _merge_scale_chains(graph):
+    """Scale(a) -> Scale(b) becomes one Scale(a*b)."""
+    g = graph.graph
+    merged = 0
+    changed = True
+    while changed:
+        changed = False
+        for node in list(g.nodes()):
+            data = g.nodes[node]
+            if data.get("op_type") != "Scale":
+                continue
+            preds = list(g.predecessors(node))
+            if len(preds) != 1:
+                continue
+            inner = preds[0]
+            inner_data = g.nodes[inner]
+            if inner_data.get("op_type") != "Scale" \
+                    or g.out_degree(inner) != 1 \
+                    or inner_data.get("is_output"):
+                continue
+            data["factor"] = float(inner_data.get("factor", 1.0)) \
+                * float(data.get("factor", 1.0))
+            for src in list(g.predecessors(inner)):
+                g.add_edge(src, node)
+            g.remove_node(inner)
+            merged += 1
+            changed = True
+            break
+    return merged
 
 
 def _evaluate(op_type, values, data):
@@ -237,6 +394,11 @@ def _eliminate_common_subexpressions(graph):
                 signature = (op_type, tuple(preds), _semantic_sig(data))
             if signature in seen and graph.graph.has_node(node):
                 canonical = seen[signature]
+                # A DiGraph cannot hold two parallel edges, so merging two
+                # operands of the same consumer would silently drop one.
+                if (set(graph.graph.successors(node))
+                        & set(graph.graph.successors(canonical))):
+                    continue
                 for succ in list(graph.graph.successors(node)):
                     graph.graph.add_edge(canonical, succ)
                 graph.graph.remove_node(node)
@@ -303,7 +465,15 @@ def _infer_shapes(graph):
             value = data.get("value")
             if value is not None:
                 shape = tuple(value.shape)
-        elif op_type in ("MatMul", "GEMM", "LinearGELU", "LinearRelu"):
+        elif op_type == "Transpose":
+            if shapes and shapes[0] is not None:
+                dims = data.get("dims")
+                if dims is None:
+                    shape = tuple(reversed(shapes[0]))
+                else:
+                    shape = tuple(shapes[0][int(d)] for d in dims)
+        elif op_type in ("MatMul", "GEMM", "LinearGELU", "LinearRelu",
+                         "LinearSiLU"):
             if shapes and all(s is not None for s in shapes):
                 shape = _matmul_output_shape(
                     shapes, transpose_rhs=bool(data.get("transpose_rhs", False))

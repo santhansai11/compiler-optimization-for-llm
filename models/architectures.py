@@ -131,9 +131,71 @@ def create_mlp_classifier_graph(sizes=(784, 256, 64, 10), params=None,
     return graph
 
 
+def create_llama_style_graph(num_blocks=2, batch=4, seq=32, d_model=64):
+    """LLaMA-style decoder: RMSNorm + attention + SwiGLU feed-forward.
+
+    Differences from GPT-2 style: RMSNorm instead of LayerNorm, a gated
+    SwiGLU feed-forward (``down(silu(gate(x)) * up(x))``) and no biases.
+    Rotary embeddings / causal masking are omitted from this IR sketch.
+    """
+    graph = ComputationGraph(f"llama_style_{num_blocks}b")
+    graph.meta["config"] = {"batch": batch, "seq": seq, "d_model": d_model}
+    scale_factor = float(1.0 / np.sqrt(d_model))
+
+    graph.add_operation("Input", "Input")
+    node = "Input"
+    for i in range(1, num_blocks + 1):
+        p = f"Block{i}"
+        graph.add_operation(f"{p}_RMSNorm1", "RMSNorm")
+        graph.add_dependency(node, f"{p}_RMSNorm1")
+        for role in ("Q", "K", "V"):
+            graph.add_operation(f"{p}_{role}_Projection", "MatMul")
+            graph.add_dependency(f"{p}_RMSNorm1", f"{p}_{role}_Projection")
+        graph.add_operation(f"{p}_QK_Score", "MatMul", transpose_rhs=True)
+        graph.add_dependency(f"{p}_Q_Projection", f"{p}_QK_Score")
+        graph.add_dependency(f"{p}_K_Projection", f"{p}_QK_Score")
+        graph.add_operation(f"{p}_Scale", "Scale", factor=scale_factor)
+        graph.add_dependency(f"{p}_QK_Score", f"{p}_Scale")
+        graph.add_operation(f"{p}_Softmax", "Softmax")
+        graph.add_dependency(f"{p}_Scale", f"{p}_Softmax")
+        graph.add_operation(f"{p}_Attention_Output", "MatMul")
+        graph.add_dependency(f"{p}_Softmax", f"{p}_Attention_Output")
+        graph.add_dependency(f"{p}_V_Projection", f"{p}_Attention_Output")
+        graph.add_operation(f"{p}_O_Projection", "MatMul")
+        graph.add_dependency(f"{p}_Attention_Output", f"{p}_O_Projection")
+        graph.add_operation(f"{p}_Attn_Residual", "Add")
+        graph.add_dependency(f"{p}_O_Projection", f"{p}_Attn_Residual")
+        graph.add_dependency(node, f"{p}_Attn_Residual")
+
+        graph.add_operation(f"{p}_RMSNorm2", "RMSNorm")
+        graph.add_dependency(f"{p}_Attn_Residual", f"{p}_RMSNorm2")
+        graph.add_operation(f"{p}_Gate_Proj", "MatMul")
+        graph.add_operation(f"{p}_Up_Proj", "MatMul")
+        graph.add_dependency(f"{p}_RMSNorm2", f"{p}_Gate_Proj")
+        graph.add_dependency(f"{p}_RMSNorm2", f"{p}_Up_Proj")
+        graph.add_operation(f"{p}_SiLU", "SiLU")
+        graph.add_dependency(f"{p}_Gate_Proj", f"{p}_SiLU")
+        graph.add_operation(f"{p}_SwiGLU_Mul", "Mul")
+        graph.add_dependency(f"{p}_SiLU", f"{p}_SwiGLU_Mul")
+        graph.add_dependency(f"{p}_Up_Proj", f"{p}_SwiGLU_Mul")
+        graph.add_operation(f"{p}_Down_Proj", "MatMul")
+        graph.add_dependency(f"{p}_SwiGLU_Mul", f"{p}_Down_Proj")
+        graph.add_operation(f"{p}_FFN_Residual", "Add")
+        graph.add_dependency(f"{p}_Down_Proj", f"{p}_FFN_Residual")
+        graph.add_dependency(f"{p}_Attn_Residual", f"{p}_FFN_Residual")
+        node = f"{p}_FFN_Residual"
+
+    graph.add_operation("Final_RMSNorm", "RMSNorm")
+    graph.add_dependency(node, "Final_RMSNorm")
+    graph.add_operation("Logits", "MatMul", is_output=True)
+    graph.add_dependency("Final_RMSNorm", "Logits")
+    return graph
+
+
 ARCHITECTURES = {
     "Post-LN Transformer": create_postln_transformer_graph,
     "Pre-LN Transformer (GPT-style)": create_preln_transformer_graph,
     "Post-LN + ReLU FFN": create_relu_transformer_graph,
+    "LLaMA-style (RMSNorm + SwiGLU)": create_llama_style_graph,
     "MLP classifier": create_mlp_classifier_graph,
 }

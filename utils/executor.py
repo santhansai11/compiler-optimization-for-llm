@@ -42,6 +42,17 @@ def _softmax(x):
     return (exp / np.sum(exp, axis=-1, keepdims=True)).astype(np.float32)
 
 
+def _rms_norm(x, eps=1e-6, weight=None):
+    out = x / np.sqrt(np.mean(x * x, axis=-1, keepdims=True) + eps)
+    if weight is not None:
+        out = out * weight
+    return out.astype(np.float32)
+
+
+def _silu(x):
+    return (x / (1.0 + np.exp(-x))).astype(np.float32)
+
+
 def _layer_norm(x, eps=1e-5, weight=None, bias=None):
     mean = np.mean(x, axis=-1, keepdims=True)
     var = np.var(x, axis=-1, keepdims=True)
@@ -187,6 +198,11 @@ def _compute(name, data, ins, feed):
             weight=data.get("weight"),
             bias=data.get("bias"),
         )
+    if op == "RMSNorm":
+        return _rms_norm(ins[0], eps=float(data.get("eps", 1e-6)),
+                         weight=data.get("weight"))
+    if op == "SiLU":
+        return _silu(ins[0])
     if op == "Gather":
         w = data.get("weight")
         if w is None:
@@ -253,6 +269,14 @@ def _compute(name, data, ins, feed):
                 + _bias(data, ins)).astype(np.float32)
     if op == "LinearGELU":
         return _gelu(_matmul(ins[:1], base, weight) + _bias(data, ins))
+    if op == "LinearSiLU":
+        return _silu(_matmul(ins[:1], base, weight) + _bias(data, ins))
+    if op == "FusedAddRMSNorm":
+        total = ins[0]
+        for value in ins[1:]:
+            total = total + value
+        return _rms_norm(total, eps=float(data.get("eps", 1e-6)),
+                         weight=data.get("weight"))
     if op == "LinearRelu":
         return np.maximum(
             _matmul(ins[:1], base, weight) + _bias(data, ins),

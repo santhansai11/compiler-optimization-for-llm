@@ -31,12 +31,16 @@ OP_LATENCY_US = {
     "Gather": 60.0,
     "Slice": 15.0,
     "Reshape": 5.0,
-    "Transpose": 8.0,
+    "Transpose": 110.0,
     "MaskedFill": 20.0,
     "Broadcast": 5.0,
     "Cast": 6.0,
     "Tanh": 45.0,
     "Pow": 60.0,
+    "RMSNorm": 120.0,
+    "SiLU": 55.0,
+    "LinearSiLU": 930.0,
+    "FusedAddRMSNorm": 170.0,
 }
 
 OP_MEMORY_MB = {
@@ -61,12 +65,16 @@ OP_MEMORY_MB = {
     "Gather": 40.0,
     "Slice": 12.0,
     "Reshape": 2.0,
-    "Transpose": 4.0,
+    "Transpose": 48.0,
     "MaskedFill": 12.0,
     "Broadcast": 2.0,
     "Cast": 3.0,
     "Tanh": 16.0,
     "Pow": 16.0,
+    "RMSNorm": 36.0,
+    "SiLU": 20.0,
+    "LinearSiLU": 112.0,
+    "FusedAddRMSNorm": 56.0,
 }
 
 # Pure shape bookkeeping: real runtimes execute these as views with no
