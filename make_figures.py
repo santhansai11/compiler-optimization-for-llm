@@ -3,6 +3,7 @@
 Run:  python make_figures.py   (writes PNGs into docs/)
 """
 
+import sys
 import os
 
 import networkx as nx
@@ -677,7 +678,11 @@ def main():
     fig7_compile(infos)
     fig8_structural(metrics)
 
+    # MNIST training figures (fig9-11) download the dataset, so they are
+    # opt-in: python make_figures.py --train
     try:
+        if "--train" not in sys.argv:
+            raise RuntimeError("pass --train to regenerate (downloads MNIST)")
         from training.train import run_training
 
         outcome = run_training()

@@ -76,13 +76,7 @@ def _gelu(x):
     ).astype(np.float32)
 
 
-def execute(graph, repeats=30, warmup=2, feed=None):
-    """Run the graph; return outputs, best-case latency and peak memory.
-
-    Latency is the minimum over ``repeats`` timed runs (the timeit-style
-    steady-state estimator — least contaminated by OS scheduling noise).
-    ``feed`` overrides the synthetic input (e.g. real dataset samples).
-    """
+def _make_feed(graph, feed):
     config = dict(DEFAULT_CONFIG)
     config.update(graph.meta.get("config") or {})
     batch = int(config["batch"])
@@ -92,47 +86,62 @@ def execute(graph, repeats=30, warmup=2, feed=None):
         rng = np.random.default_rng(0)
         if config.get("llm"):
             vocab = int(config.get("vocab_size", 50257))
-            feed = rng.integers(
-                0, vocab, [batch] + input_shape
-            ).astype(np.int64)
-        else:
-            feed = rng.standard_normal([batch] + input_shape).astype(
-                np.float32
-            )
-    else:
-        feed = np.asarray(feed, dtype=np.float32)
+            return rng.integers(0, vocab, [batch] + input_shape).astype(np.int64)
+        return rng.standard_normal([batch] + input_shape).astype(np.float32)
+    return np.asarray(feed, dtype=np.float32)
+
+
+def _make_runner(graph, feed):
+    """Precompute the execution plan once; return ``run_once(track_memory)``.
+
+    Ordering, predecessor lists and use-counts are built outside the timed
+    region so timings measure kernel work, not graph bookkeeping (which
+    would otherwise penalise graphs that simply have more nodes).
+    """
+    order = list(graph.topological_order())
+    nodes = graph.graph.nodes
+    plan = [(n, nodes[n], list(graph.predecessors(n))) for n in order]
+    uses0 = {n: graph.graph.out_degree(n) for n in order}
+    keep = {n for n in order if nodes[n].get("is_output")}
+    sinks = [n for n in order if graph.graph.out_degree(n) == 0]
 
     def run_once(track_memory):
         cache = {}
-        alive = 0
-        peak = 0
-        uses_left = {
-            node: graph.graph.out_degree(node) for node in graph.graph.nodes()
-        }
-        for node in graph.topological_order():
-            data = graph.graph.nodes[node]
-            ins = [cache[pred] for pred in graph.predecessors(node)]
-            out = _compute(node, data, ins, feed)
+        uses_left = dict(uses0)
+        alive = peak = 0
+        for node, data, preds in plan:
+            out = _compute(node, data, [cache[p] for p in preds], feed)
             cache[node] = out
             if track_memory:
                 alive += int(out.nbytes)
                 peak = max(peak, alive)
-            for pred in graph.predecessors(node):
+            for pred in preds:
                 uses_left[pred] -= 1
-                if (
-                    uses_left[pred] == 0
-                    and not graph.graph.nodes[pred].get("is_output")
-                ):
+                if uses_left[pred] == 0 and pred not in keep:
                     if track_memory:
                         alive -= int(cache[pred].nbytes)
                     del cache[pred]
-        outputs = {
-            node: cache[node]
-            for node in graph.graph.nodes()
-            if node in cache and graph.graph.out_degree(node) == 0
-        }
-        return outputs, peak
+        return {n: cache[n] for n in sinks if n in cache}, peak
 
+    return run_once
+
+
+def _main_output(graph, outputs):
+    for node, data in graph.graph.nodes(data=True):
+        if data.get("is_output") and node in outputs:
+            return outputs[node]
+    return outputs[sorted(outputs)[0]] if outputs else None
+
+
+def execute(graph, repeats=30, warmup=2, feed=None):
+    """Run the graph; return outputs, best-case latency and peak memory.
+
+    Latency is the minimum over ``repeats`` timed runs (the timeit-style
+    steady-state estimator - least contaminated by OS scheduling noise).
+    ``feed`` overrides the synthetic input (e.g. real dataset samples).
+    """
+    feed = _make_feed(graph, feed)
+    run_once = _make_runner(graph, feed)
     for _ in range(warmup):
         run_once(False)
     timings = []
@@ -141,21 +150,42 @@ def execute(graph, repeats=30, warmup=2, feed=None):
         run_once(False)
         timings.append(time.perf_counter() - started)
     outputs, peak = run_once(True)
-
-    main_output = None
-    for node, data in graph.graph.nodes(data=True):
-        if data.get("is_output") and node in outputs:
-            main_output = outputs[node]
-            break
-    if main_output is None and outputs:
-        main_output = outputs[sorted(outputs)[0]]
-
     return {
         "outputs": outputs,
-        "output": main_output,
+        "output": _main_output(graph, outputs),
         "latency_s": float(np.min(timings)),
         "peak_bytes": int(peak),
     }
+
+
+def compare_latency(graph_a, graph_b, repeats=60, warmup=3, feed=None):
+    """Interleaved A/B timing: returns ``(min_a_s, min_b_s)``.
+
+    Alternating the two graphs inside one loop (and swapping who goes first
+    each round) cancels slow drift from CPU frequency changes or background
+    load, which otherwise biases whichever graph is timed second.
+    """
+    import gc
+
+    run_a = _make_runner(graph_a, _make_feed(graph_a, feed))
+    run_b = _make_runner(graph_b, _make_feed(graph_b, feed))
+    for _ in range(warmup):
+        run_a(False)
+        run_b(False)
+    best = [float("inf"), float("inf")]
+    runners = [run_a, run_b]
+    was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        for i in range(repeats):
+            for idx in ((0, 1) if i % 2 == 0 else (1, 0)):
+                started = time.perf_counter()
+                runners[idx](False)
+                best[idx] = min(best[idx], time.perf_counter() - started)
+    finally:
+        if was_enabled:
+            gc.enable()
+    return best[0], best[1]
 
 
 def _compute(name, data, ins, feed):

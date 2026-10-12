@@ -6,7 +6,7 @@
  "steps": 2500,
  "batch": 64,
  "seq": 64,
- "train_seconds": 39.32821607589722,
+ "train_seconds": 37.117429971694946,
  "train_loss": 1.5185798227787017,
  "val_loss": 1.7146931648254395,
  "val_perplexity": 5.554970790408312,
@@ -32,16 +32,16 @@
  },
  "kernel_launch_reduction": 0.5625,
  "latency_ms": {
-  "original": 1.4632919992436655,
-  "optimized": 1.3997920013935072
+  "original": 1.3746249987889314,
+  "optimized": 1.3694170011149254
  },
- "speedup_measured": 1.0453638810530017,
+ "speedup_measured": 1.0038030765426207,
  "speedup_modeled": 1.57202486678508,
  "gpu_memory_mb": [
   2608.0,
   318.0
  ],
- "compile_ms": 1.4785830007895129,
+ "compile_ms": 1.6651249989081407,
  "fused_types": {
   "GEMM": 4,
   "LinearGELU": 2,

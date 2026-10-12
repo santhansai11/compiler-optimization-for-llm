@@ -9,7 +9,7 @@ from utils.cost_model import (
     scheduled_latency_us,
     sequential_latency_us,
 )
-from utils.executor import execute
+from utils.executor import compare_latency, execute
 
 
 def compute_metrics(original_graph, optimized_graph, pass_infos,
@@ -55,8 +55,12 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
     )
 
     # ---- Measured (NumPy reference executor) ----
-    original_run = execute(original_graph)
-    optimized_run = execute(optimized_graph)
+    original_run = execute(original_graph, repeats=3, warmup=1)
+    optimized_run = execute(optimized_graph, repeats=3, warmup=1)
+    # Interleaved A/B timing replaces the two independent estimates.
+    original_run["latency_s"], optimized_run["latency_s"] = compare_latency(
+        original_graph, optimized_graph
+    )
 
     latency_original_ms = original_run["latency_s"] * 1e3
     latency_optimized_ms = optimized_run["latency_s"] * 1e3

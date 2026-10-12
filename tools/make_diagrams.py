@@ -290,7 +290,38 @@ def fig_architectures():
     save(fig, "fig_architectures")
 
 
+def fig_architecture_comparison():
+    """Nodes before/after and modeled speedup for every architecture."""
+    from models.architectures import ARCHITECTURES
+    from utils.metrics import compute_metrics
+
+    rows = []
+    for name, build in ARCHITECTURES.items():
+        g = build()
+        opt, infos, t = run_pipeline(g, partition=False)
+        m = compute_metrics(g, opt, infos, t)
+        rows.append((name.replace(" (", "\n("), g.node_count(), opt.node_count(),
+                     m["modeled"]["speedup"]))
+    fig, ax = plt.subplots(figsize=(12, 4.8))
+    x = range(len(rows))
+    ax.bar([i - 0.2 for i in x], [r[1] for r in rows], 0.4, label="original", color="#9aa3b5")
+    ax.bar([i + 0.2 for i in x], [r[2] for r in rows], 0.4, label="optimized", color="#5048e5")
+    for i, r in enumerate(rows):
+        ax.text(i - 0.2, r[1] + 1, str(r[1]), ha="center", fontsize=8)
+        ax.text(i + 0.2, r[2] + 1, str(r[2]), ha="center", fontsize=8)
+    ax.set_xticks(list(x))
+    ax.set_xticklabels([f"{r[0]}\n{r[3]:.2f}x modeled" for r in rows], fontsize=7.5)
+    ax.set_ylabel("graph nodes")
+    ax.set_title("Same compiler, different architectures: nodes before/after and modeled speedup")
+    ax.legend()
+    ax.grid(axis="y", alpha=.3)
+    fig.tight_layout()
+    save(fig, "fig_architecture_comparison")
+    import shutil
+    shutil.copy(OUT[0] / "fig_architecture_comparison.png", ROOT / "docs" / "fig12_architectures.png")
+
+
 if __name__ == "__main__":
-    for fn in (fig_system_architecture, fig_block_diagram, fig_attention_fusion,
+    for fn in (fig_architecture_comparison, fig_system_architecture, fig_block_diagram, fig_attention_fusion,
                fig_transpose_algebra, fig_dags_schedule, fig_partitioning, fig_architectures):
         fn()

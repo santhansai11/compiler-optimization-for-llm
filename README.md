@@ -11,7 +11,7 @@ python -m unittest discover -s tests -t .   # correctness tests
 python tools/make_diagrams.py               # regenerate figures in docs/diagrams
 ```
 
-Requires Python 3.12 and Node.js. (`requirements.txt` includes torch and jax for the FX/XLA tabs.) The old MNIST path (`training/train.py`) additionally needs `pip install torchvision`; the GUI does not use it.
+Requires Python 3.12 and Node.js. (`requirements.txt` includes torch and jax for the FX/XLA tabs.)
 
 ## The passes (the three required algorithms + two extras)
 
@@ -33,21 +33,21 @@ Post-LN Transformer (2 and 4 blocks), Pre-LN (GPT-2 style), Post-LN+ReLU, **LLaM
 
 Inference latency, throughput, speedup, peak GPU memory, Graph Reduction Ratio (GRR), model accuracy preservation, Operator Merge Ratio (OMR), Attention Canonicalization Rate (ACR), kernel-launch reduction, compilation time — computed in `utils/metrics.py`, shown in the GUI Overview tab and exported to Excel (`utils/reports.py`).
 
-Sample result (batch 4, seq 32, d_model 64; normalization + canonicalization + merging + DAGS, no partitioning; measured column varies ±10% run to run):
+Sample result (batch 4, seq 32, d_model 64; normalization + canonicalization + merging + DAGS, no partitioning; measured column is interleaved A/B timing, ±1% run to run):
 
 | Architecture | Nodes | GRR | OMR | ACR | Launch red. | Speedup meas. | Speedup model | Accuracy |
 |---|---|---|---|---|---|---|---|---|
-| Post-LN Transformer | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.18× | 1.73× | PASS |
-| Pre-LN Transformer (GPT-style) | 36 → 16 | 55.6% | 22.2% | 100% | 55.6% | 1.12× | 1.67× | PASS |
-| Post-LN + ReLU FFN | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.22× | 1.74× | PASS |
-| LLaMA-style (RMSNorm + SwiGLU) | 37 → 22 | 40.5% | 8.1% | 100% | 40.5% | 1.14× | 1.71× | PASS |
-| MoE Transformer (parallel experts) | 53 → 32 | 39.6% | 17.0% | 100% | 39.6% | 1.03× | 2.75× | PASS |
-| Multi-head Transformer (parallel heads) | 75 → 24 | 68.0% | 4.0% | 100% | 68.0% | 1.11× | 4.55× | PASS |
-| MLP classifier | 13 → 5 | 61.5% | 38.5% | N/A | 61.5% | 1.06× | 1.08× | PASS |
+| Post-LN Transformer | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.11× | 1.73× | PASS |
+| Pre-LN Transformer (GPT-style) | 36 → 16 | 55.6% | 22.2% | 100% | 55.6% | 1.03× | 1.67× | PASS |
+| Post-LN + ReLU FFN | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.12× | 1.74× | PASS |
+| LLaMA-style (RMSNorm + SwiGLU) | 37 → 22 | 40.5% | 8.1% | 100% | 40.5% | 1.09× | 1.71× | PASS |
+| MoE Transformer (parallel experts) | 53 → 32 | 39.6% | 17.0% | 100% | 39.6% | 1.00× | 2.75× | PASS |
+| Multi-head Transformer (parallel heads) | 75 → 24 | 68.0% | 4.0% | 100% | 68.0% | 1.10× | 4.55× | PASS |
+| MLP classifier | 13 → 5 | 61.5% | 38.5% | N/A | 61.5% | 1.01× | 1.08× | PASS |
 
 ### How to read the numbers (honest limitations)
 
-* **Measured** = NumPy reference executor on CPU (noisy; run-to-run variation of ±10% is normal — a no-pass baseline can show 1.0–1.1×).
+* **Measured** = NumPy reference executor on CPU. Original and optimized graphs are timed interleaved (alternating runs, min of 60), with the execution plan built outside the timed region; run-to-run spread is about ±1%. Fusion barely helps on tiny CPU tensors (most speedups are 1.00–1.12×), so the modeled column is where kernel/memory savings show up.
 * **Modeled** = hand-written GPU cost table in `utils/cost_model.py`. **Peak GPU memory is modeled, not measured: no GPU is used.**
 * **Two modeled speedups.** "Modeled GPU speedup" (Overview cards) assumes independent kernels overlap on one GPU. The *deployment* speedup (shown under the cards, used by the learned optimizer) runs one kernel stream per device and charges 150 µs per cross-device transfer. They differ by design; neither is a GPU measurement.
 * Kernel-launch reduction counts surviving operator nodes; it is a proxy, not a profiler reading.
@@ -70,10 +70,10 @@ Sample result (batch 4, seq 32, d_model 64; normalization + canonicalization + m
 | No passes | 1.00 |
 | Fixed pipeline, 1 device (old default) | 1.48 |
 | Fixed pipeline, 4 devices | 1.76 |
-| **Learned plan** | **1.81** |
+| **Learned plan** | **1.82** |
 | Oracle (best of 32) | 1.86 |
 
-Mean regret vs oracle 3.3%; within 2% of oracle on 70% of graphs. Large gains on the wide families (MoE 2.05 vs 1.20, multi-head 3.50 vs 1.89 fixed) even when held out; weakest on the MLP family (10.8% regret) and LLaMA (5.9%). Caveats: MoE and multi-head are structurally similar to each other, so each helps the other generalize; rewards come from the cost model, so the model learns that cost model; exact-plan match is only 21% (many plans are near-ties). Retrain: `python -m search.learned_optimizer train` (~1 min). Results: `docs/results/learned_results.json`; GUI tab "Learned optimizer".
+Mean regret vs oracle 2.6%; within 2% of oracle on 72% of graphs. Large gains on the wide families (MoE 2.05 vs 1.20, multi-head 3.49 vs 1.89 fixed) even when held out; weakest on the MLP family (6.4% regret; there the fixed pipeline, 1.11, still beats the learned plan, 1.04) and LLaMA (5.6%). Adding global features (available parallelism = total work / critical path) cut regret from 3.3% to 2.6%; a 5-model ensemble did not help. Caveats: MoE and multi-head are structurally similar to each other, so each helps the other generalize; rewards come from the cost model, so the model learns that cost model; exact-plan match is only 31% (many plans are near-ties). Retrain: `python -m search.learned_optimizer train` (~1 min). Results: `docs/results/learned_results.json`; GUI tab "Learned optimizer".
 
 ## Trained model experiment (Tiny Shakespeare)
 
