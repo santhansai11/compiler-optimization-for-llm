@@ -48,6 +48,7 @@ Sample result (batch 4, seq 32, d_model 64, all passes except partitioning):
 
 * **Measured** = NumPy reference executor on CPU (noisy; run-to-run variation of ±10% is normal — a no-pass baseline can show 1.0–1.1×).
 * **Modeled** = hand-written GPU cost table in `utils/cost_model.py`. **Peak GPU memory is modeled, not measured: no GPU is used.**
+* **Two modeled speedups.** "Modeled GPU speedup" (Overview cards) assumes independent kernels overlap on one GPU. The *deployment* speedup (shown under the cards, used by the learned optimizer) runs one kernel stream per device and charges 150 µs per cross-device transfer. They differ by design; neither is a GPU measurement.
 * Kernel-launch reduction counts surviving operator nodes; it is a proxy, not a profiler reading.
 * The PyTorch FX attention benchmark (`run_attention_optimization.py`) reduces nodes 11→4 but runs the same math, so its speedup is ≈1.0×. The JAX/XLA comparison (`xla_compare.py`) is CPU-only and uses separate equivalent code.
 * The model graphs are templates with synthetic weights/inputs; accuracy preservation means output equivalence, not task accuracy.

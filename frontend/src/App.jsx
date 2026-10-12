@@ -350,6 +350,7 @@ function App() {
               <MetricCard label="Kernel launch reduction" value={`${(metrics.kernel_launch_reduction * 100).toFixed(1)}%`} foot={`${counts.kernel_launches_original} → ${counts.kernel_launches_optimized} launches`} icon={Zap} tone="green" />
               <MetricCard label="Compilation time" value={`${(metrics.compilation_time_s * 1000).toFixed(1)} ms`} foot={`${Object.keys(metrics.pass_durations_s || {}).length} stages`} icon={Cpu} />
             </div>
+            {result.deployment && <div className="metric-note"><Braces size={15} /> Two modeled speedups, two assumptions: <b>{metrics.modeled.speedup.toFixed(2)}×</b> (cards above) lets independent kernels overlap on one GPU (DAGS); <b>{(result.deployment.original_us / result.deployment.optimized_us).toFixed(2)}×</b> runs one kernel stream per device with transfer costs ({result.deployment.devices} device{result.deployment.devices > 1 ? 's' : ''}) — the learned optimizer's reward uses this one. Neither is a GPU measurement.</div>}
             <div className="charts-grid">
               <Panel title="Graph size through the pipeline" eyebrow="NORMALIZATION + FUSION" icon={GitBranch}><BarChart rows={graphSteps.map((step, index) => ({ label: step.stage, value: step.ops, tone: index === graphSteps.length - 1 ? 'tone-purple' : '', detail: `${step.ops} operations` }))} unit=" ops" precision={0} /></Panel>
               <Panel title="Latency comparison" eyebrow="REFERENCE EXECUTOR · MS" icon={Gauge}><BarChart rows={[
