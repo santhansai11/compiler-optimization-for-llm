@@ -160,6 +160,7 @@ function App() {
   const [ablation, setAblation] = useState(null)
   const [busy, setBusy] = useState('')
   const [learned, setLearned] = useState(null)
+  const [gpuRuns, setGpuRuns] = useState(null)
 
   useEffect(() => {
     api('status').then(() => setHealth('online')).catch(() => setHealth('offline'))
@@ -239,6 +240,11 @@ function App() {
   async function loadAblation() {
     setBusy('ablation'); setError('')
     try { setAblation(await api('ablation', { ...workload, model_id: modelId })) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  async function loadGpu() {
+    setBusy('gpu'); setError('')
+    try { setGpuRuns((await api('gpu_results')).runs) } catch (e) { setError(e.message) } finally { setBusy('') }
   }
 
   async function askLearned() {
@@ -331,7 +337,7 @@ function App() {
         {result && <>
           <nav className="tabs-nav" aria-label="Dashboard sections">
             {[
-              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['learned', 'Learned optimizer', Zap], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
+              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['learned', 'Learned optimizer', Zap], ['gpu', 'Real GPU', Cpu], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
             ].map(([id, label, Icon]) => <button key={id} className={`tab-btn ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id)}><Icon size={16} />{label}{id === 'xla' && xla?.all_correct && <span className="tab-check"><Check size={11} /></span>}</button>)}
             {report && <a className="download-btn" href={report.download_url}><Download size={15} /> Download XLSX</a>}
           </nav>
@@ -422,6 +428,21 @@ function App() {
                 <figure className="panel diagram-card"><figcaption>Leave-one-family-out results</figcaption><img src="/diagrams/fig_learned_optimizer.png" alt="Learned optimizer results" /></figure>
               </>}
             </> : <div className="panel xla-empty"><div className="empty-icon"><Zap size={22} /></div><h3>Ask the learned optimizer</h3><p>It predicts the best plan for the selected model without trying all 32.</p></div>}
+          </div>}
+
+          {activeTab === 'gpu' && <div className="dashboard animate-fade">
+            <div className="section-intro"><div><div className="eyebrow">MEASURED ON REAL HARDWARE</div><h2>Real GPU results vs the cost model</h2><p>Original and compiled graphs executed on an actual GPU (synchronised, interleaved timing, outputs verified). Produced by <code>python benchmarks/gpu_benchmark.py</code>; Colab/NVIDIA runs can be dropped into <code>docs/results/</code>.</p></div><div className="sweep-actions"><button className="btn-secondary" onClick={loadGpu} disabled={busy === 'gpu'}>{busy === 'gpu' ? <RefreshCw size={15} className="spin" /> : <Cpu size={15} />}{busy === 'gpu' ? 'Loading…' : 'Load GPU results'}</button></div></div>
+            {gpuRuns && (gpuRuns.length ? gpuRuns.map((run) => <div key={run.file}>
+              <div className="metrics-grid">
+                <MetricCard label="Device" value={run.device.toUpperCase()} foot={run.device_name} icon={Cpu} tone="purple" />
+                <MetricCard label="Median real speedup" value={`${run.summary.median_speedup_auto.toFixed(2)}×`} foot={`fixed fused kernel ${run.summary.median_speedup_sdpa.toFixed(2)}× · best ${run.summary.max_speedup_auto.toFixed(2)}×`} icon={Gauge} tone="green" />
+                <MetricCard label="Median modeled speedup" value={`${run.summary.median_modeled_speedup.toFixed(2)}×`} foot="cost model prediction" icon={ArrowUpRight} tone="amber" />
+                <MetricCard label="Outputs identical" value={run.summary.all_outputs_match ? 'All match' : 'MISMATCH'} foot={`${run.rows.length} runs · ${run.timestamp}`} icon={Check} tone={run.summary.all_outputs_match ? 'green' : 'amber'} />
+              </div>
+              <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Architecture</th><th>B·S·D</th><th>Original ms</th><th>Fused kernel ms</th><th>Autotuned ms</th><th>Real speedup</th><th>Modeled</th><th>Dispatches</th><th>Live peak MB</th><th>Match</th></tr></thead><tbody>{run.rows.map((r, i) => <tr key={i}><td>{r.architecture}</td><td>{r.batch}·{r.seq}·{r.d_model}</td><td>{r.latency_ms_original.toFixed(3)}</td><td>{r.latency_ms_optimized_sdpa.toFixed(3)} ({r.speedup_sdpa.toFixed(2)}×)</td><td>{r.latency_ms_optimized_auto.toFixed(3)}</td><td><b>{r.speedup_auto.toFixed(2)}×</b></td><td>{r.modeled_speedup.toFixed(2)}×</td><td>{r.kernel_dispatches_original} → {r.kernel_dispatches_auto}</td><td>{r.live_peak_mb_original.toFixed(1)} → {r.live_peak_mb_optimized.toFixed(1)}</td><td className={r.outputs_match ? 'correct-cell' : 'incorrect-cell'}>{r.outputs_match ? 'PASS' : 'CHECK'}</td></tr>)}</tbody></table></div></div>
+              <div className="metric-note"><Braces size={15} /> {run.method}. Dispatch counts are torch calls issued, not a hardware profile. On this GPU the fixed fused-attention kernel is slower than separate matmul+softmax at mid sizes; "autotuned" times both once per shape and keeps the faster.</div>
+            </div>) : <div className="panel xla-empty"><h3>No GPU result files found</h3><p>Run <code>python benchmarks/gpu_benchmark.py</code>.</p></div>)}
+            {!gpuRuns && <div className="panel xla-empty"><div className="empty-icon"><Cpu size={22} /></div><h3>Load measured GPU results</h3></div>}
           </div>}
 
           {activeTab === 'diagrams' && <div className="dashboard animate-fade">

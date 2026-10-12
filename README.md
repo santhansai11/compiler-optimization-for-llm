@@ -48,12 +48,24 @@ Sample result (batch 4, seq 32, d_model 64; normalization + canonicalization + m
 ### How to read the numbers (honest limitations)
 
 * **Measured** = NumPy reference executor on CPU. Original and optimized graphs are timed interleaved (alternating runs, min of 60), with the execution plan built outside the timed region; run-to-run spread is about ±1%. Fusion barely helps on tiny CPU tensors (most speedups are 1.00–1.12×), so the modeled column is where kernel/memory savings show up.
-* **Modeled** = hand-written GPU cost table in `utils/cost_model.py`. **Peak GPU memory is modeled, not measured: no GPU is used.**
+* **Modeled** = hand-written GPU cost table in `utils/cost_model.py`. **"Peak GPU memory" in the Overview is modeled.** Real-GPU latency, speedup and live-tensor memory are measured separately in the Real GPU tab (see above) and disagree with the model.
 * **Two modeled speedups.** "Modeled GPU speedup" (Overview cards) assumes independent kernels overlap on one GPU. The *deployment* speedup (shown under the cards, used by the learned optimizer) runs one kernel stream per device and charges 150 µs per cross-device transfer. They differ by design; neither is a GPU measurement.
 * Kernel-launch reduction counts surviving operator nodes; it is a proxy, not a profiler reading.
 * The PyTorch FX attention benchmark (`run_attention_optimization.py`) reduces nodes 11→4 but runs the same math, so its speedup is ≈1.0×. The JAX/XLA comparison (`xla_compare.py`) is CPU-only and uses separate equivalent code.
 * The model graphs are templates with synthetic weights/inputs; accuracy preservation means output equivalence, not task accuracy.
 * The learned optimizer trains on generated graphs with cost-model labels (see above); PassNet-style real-graph data with measured GPU labels is future work. `search/gnn*.py`, `search/rl.py`, `search/neuro_symbolic.py` are older prototypes.
+
+## Real GPU measurements
+
+`python benchmarks/gpu_benchmark.py` runs the original and compiled graphs on a real device (CUDA > Apple MPS > CPU) with `utils/torch_executor.py`, using synchronised, interleaved timing (min of 50) and verifies outputs. FusedAttention is lowered to PyTorch's fused attention kernel (`fixed`) or to the faster of fused vs composed matmul/softmax chosen by a one-time per-shape benchmark (`autotuned`). Results on this repo's author machine (**Apple M3 Pro GPU via Metal/MPS**, torch 2.14, float32; `docs/results/gpu_mps.json`), 6 architectures × 3 sizes = 18 runs, all outputs identical:
+
+| | Median | Range |
+|---|---|---|
+| Real speedup, autotuned lowering | **1.03×** | 0.94× – 1.56× |
+| Real speedup, fixed fused-attention kernel | 1.00× | 0.72× – 1.62× |
+| Cost-model (modeled) speedup, same graphs | 1.74× | 1.67× – 4.55× |
+
+The cost model **overstates** real gains: the biggest real win is 1.56× (multi-head, tiny size, where launch overhead dominates); at B8·S512·D512 matmuls dominate and fusion changes almost nothing (≈1.0×). The fixed fused-attention kernel is slower than composed attention at mid sizes on MPS (0.72–0.84×). Peak memory is "live tensor" bytes, not allocator peaks (MPS has no peak counter); kernel counts are torch calls issued. `benchmarks/colab_gpu_benchmark.ipynb` runs the same script on a Colab NVIDIA GPU (untested by us: no Colab run yet), which additionally records CUDA allocator peaks.
 
 ## Learned optimizer (GNN plan selection)
 

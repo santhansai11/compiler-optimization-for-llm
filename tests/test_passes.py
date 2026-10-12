@@ -83,5 +83,23 @@ class LearnedOptimizerTests(unittest.TestCase):
                 self.assertGreater(got, true[fixed] * 1.3)
 
 
+class TorchExecutorTests(unittest.TestCase):
+    def test_torch_executor_matches_numpy_on_cpu(self):
+        import numpy as np
+        import torch
+        from utils.executor import execute
+        from utils.torch_executor import gpu_compare
+        for name in ("Post-LN Transformer", "Pre-LN Transformer (GPT-style)",
+                     "LLaMA-style (RMSNorm + SwiGLU)", "MoE Transformer (parallel experts)",
+                     "Multi-head Transformer (parallel heads)"):
+            g = ARCHITECTURES[name](batch=2, seq=16, d_model=32)
+            opt, _, _ = run_pipeline(g, partition=False)
+            ref = execute(g, repeats=1, warmup=0)["output"]
+            for res in gpu_compare([(g, "composed"), (opt, "sdpa"), (opt, "auto")],
+                                   torch.device("cpu"), repeats=2, warmup=1):
+                scale = max(1e-6, float(np.abs(ref).max()))
+                self.assertLess(float(np.abs(res["output"] - ref).max()) / scale, 1e-3, name)
+
+
 if __name__ == "__main__":
     unittest.main()

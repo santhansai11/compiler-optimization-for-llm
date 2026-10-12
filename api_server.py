@@ -227,6 +227,11 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
 
         if path == "/api/status":
             self._send_json({"status": "ready", "engine": "LLM Compiler Optimizer v2.0", "target": "React Web App"})
+        elif path == "/api/gpu_results":
+            runs = []
+            for f in sorted((PROJECT_ROOT / "docs" / "results").glob("gpu_*.json")):
+                runs.append({"file": f.name, **json.loads(f.read_text())})
+            self._send_json({"runs": runs})
         elif path == "/api/models":
             models = []
             for model_id, (name, builder, desc) in MODEL_REGISTRY.items():
