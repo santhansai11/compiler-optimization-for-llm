@@ -85,6 +85,13 @@ class ComputationGraph:
     def copy(self):
         """Return a deep-enough clone (graph structure + attrs + meta)."""
         clone = ComputationGraph(self.name)
-        clone.graph = nx.DiGraph(self.graph)
+        # Rebuild in-edges per consumer so operand order (lhs/rhs of a
+        # MatMul, MaskedFill inputs, ...) survives; nx.DiGraph(G) would
+        # re-order them by source-node insertion order.
+        for node, data in self.graph.nodes(data=True):
+            clone.graph.add_node(node, **data)
+        for node in self.graph.nodes():
+            for pred in self.graph.predecessors(node):
+                clone.graph.add_edge(pred, node, **self.graph.edges[pred, node])
         clone.meta = dict(self.meta)
         return clone

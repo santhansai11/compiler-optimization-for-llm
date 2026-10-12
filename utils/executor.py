@@ -72,7 +72,7 @@ def _gelu(x):
     return (
         0.5
         * x
-        * (1.0 + np.tanh(_GELU_C * (x * x * x + np.float32(0.044715) * x)))
+        * (1.0 + np.tanh(_GELU_C * (x + np.float32(0.044715) * x * x * x)))
     ).astype(np.float32)
 
 
@@ -388,7 +388,9 @@ def _fused_attention(data, ins):
         v = _apply_steps(x, data.get("v_transform") or [])
         # k may already be in K^T layout (the transpose can sit inside its
         # view chain); resolve orientation by shape like _matmul does.
-        if q.shape[-1] == k.shape[-2]:
+        if data.get("transpose_rhs"):
+            scores = q @ k.swapaxes(-1, -2)
+        elif q.shape[-1] == k.shape[-2]:
             scores = q @ k
         elif q.shape[-1] == k.shape[-1]:
             scores = q @ k.swapaxes(-1, -2)

@@ -122,8 +122,9 @@ def normalize_graph(graph):
         attrs = {key: value for key, value in data.items() if key != "op_type"}
         normalized.add_operation(canonical_name, canonical_type, **attrs)
 
-    for source, target in graph.graph.edges():
-        normalized.add_dependency(name_map[source], name_map[target])
+    for target in graph.graph.nodes():  # in-edge order = operand order
+        for source in graph.graph.predecessors(target):
+            normalized.add_dependency(name_map[source], name_map[target])
 
     # Step 2-6: structural cleanups and analysis.
     info["identities_removed"] = _remove_identities(normalized)

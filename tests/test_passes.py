@@ -10,6 +10,9 @@ from utils.metrics import compute_metrics
 
 GRAPHS = {n: f for n, f in ARCHITECTURES.items()}
 GRAPHS.update({k: v[1] for k, v in OPERATION_DEMOS.items()})
+from models.tiny_lm import WEIGHTS_PATH, build_graph as _lm  # noqa: E402
+if WEIGHTS_PATH.exists():
+    GRAPHS["tiny_lm"] = lambda: _lm(batch=2, seq=64)
 
 
 class PassTests(unittest.TestCase):

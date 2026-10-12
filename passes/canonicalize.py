@@ -450,6 +450,17 @@ def _replace_attention_pattern(g, pattern, fused_name):
     member_set = set(members)
     absorbed = pattern.get("absorbed") or set()
     remove = member_set | absorbed
+    mask_node = pattern.get("mask")
+    # The mask op is folded into the fused operator (mask_kind/mask_fill),
+    # so it and any constants only it consumed must not be left behind.
+    mask_consts = set()
+    if mask_node is not None:
+        remove = remove | {mask_node}
+        mask_consts = {
+            p for p in g.predecessors(mask_node)
+            if g.nodes[p].get("op_type") == "Constant"
+            and set(g.successors(p)) == {mask_node}
+        }
 
     scale_data = g.nodes[pattern["scale"]]
     attrs = {
@@ -458,6 +469,9 @@ def _replace_attention_pattern(g, pattern, fused_name):
     }
     if "factor" in scale_data:
         attrs["factor"] = scale_data["factor"]
+    if g.nodes[pattern["score"]].get("transpose_rhs"):
+        # Explicit K^T layout: never infer it from (possibly square) shapes.
+        attrs["transpose_rhs"] = True
 
     # Q/K/V view chains (real exports): the fused operator replays them.
     if any(pattern.get(f"{role}_transform") for role in ("q", "k", "v")):
@@ -466,7 +480,6 @@ def _replace_attention_pattern(g, pattern, fused_name):
 
     # Causal mask (real exports): either an additive 0/-inf array or a
     # where-style tril selection.
-    mask_node = pattern.get("mask")
     if mask_node is not None:
         kind = _mask_is_causal(g, mask_node)
         attrs["mask_kind"] = kind
@@ -497,7 +510,7 @@ def _replace_attention_pattern(g, pattern, fused_name):
     g.add_edge(pattern["input"], fused_name)
     for succ in outputs:
         g.add_edge(fused_name, succ)
-    for node in remove:
+    for node in remove | mask_consts:
         if g.has_node(node):
             g.remove_node(node)
     return fused_name

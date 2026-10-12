@@ -22,3 +22,4 @@ node_modules/
 __pycache__/
 frontend/dist/
 *.pyc
+!models/tiny_lm_weights.npz

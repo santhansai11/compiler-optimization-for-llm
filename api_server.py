@@ -32,6 +32,7 @@ from models.architectures import (
     create_mlp_classifier_graph,
 )
 from models.operations import OPERATION_DEMOS
+from models.tiny_lm import WEIGHTS_PATH as LM_WEIGHTS, build_graph as build_tiny_lm
 from utils.reports import write_report
 from pipeline import run_pipeline
 from passes.normalize import normalize as normalize_fx
@@ -70,6 +71,11 @@ MODEL_REGISTRY = {
                        lambda b, s, d: create_mlp_classifier_graph(batch=256),
                        "Plain feed-forward network (random weights)"),
 }
+if LM_WEIGHTS.exists():
+    MODEL_REGISTRY["tiny_lm"] = (
+        "Trained Tiny Shakespeare LM (2 blocks)",
+        lambda b, s, d: build_tiny_lm(b, s),
+        "Real trained character-level Transformer (112k params)")
 for _id, (_name, _builder, _desc) in OPERATION_DEMOS.items():
     MODEL_REGISTRY[_id] = (_name, (lambda f: lambda b, s, d: f(b, s, d))(_builder), _desc)
 

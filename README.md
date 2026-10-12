@@ -53,6 +53,20 @@ Sample result (batch 4, seq 32, d_model 64, all passes except partitioning):
 * The model graphs are templates with synthetic weights/inputs; accuracy preservation means output equivalence, not task accuracy.
 * No dataset is needed: the optimizer sees shapes and operations only. PassNet / WikiText are noted as future work for learned-search training (`search/`, `training/` are earlier prototypes).
 
+## Trained model experiment (Tiny Shakespeare)
+
+`python training/train_lm.py` trains a 112k-parameter, 2-block, pre-LN character-level Transformer on Tiny Shakespeare (1.1 M characters, from the public karpathy/char-rnn repo; downloaded to `training/data/`, not committed), exports the **trained** weights into the IR, compiles it with all passes, and checks the result against PyTorch. Trained weights are committed in `models/tiny_lm_weights.npz`, so the GUI lists "Trained Tiny Shakespeare LM". Results are saved in `docs/results/lm_results.json`.
+
+| Result (2,500 steps, ~35 s on a laptop CPU) | Value |
+|---|---|
+| Validation loss / perplexity | 1.715 / 5.55 |
+| Graph | 48 → 21 nodes (GRR 56.3%), ACR 100% |
+| Compiled vs PyTorch logits, max abs diff | 4.4e-5 (float32 rounding) |
+| Identical top-1 next-character predictions | 100% |
+| Next-char NLL: PyTorch vs compiled | 1.4985 vs 1.4985 |
+
+Only the model is trained; the compiler passes remain rule-based. The tiny model has a single attention head (the IR has no head-split/concat ops).
+
 ## GUI tabs
 
 Overview (10 metrics + charts) · Graph transforms (before/after DAG) · Architectures (side-by-side table, Excel export) · Ablation (each pass alone vs all) · Diagrams (system architecture, block diagram, pass figures) · XLA comparison · Stress sweep. Passes can be toggled; partitioning supports graph or hypergraph mode.
