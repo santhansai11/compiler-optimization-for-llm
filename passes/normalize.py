@@ -9,6 +9,8 @@ carries per-feature counts for the metrics layer.
 import re
 import time
 
+import numpy as np
+
 from ir.graph import ComputationGraph
 
 
@@ -31,6 +33,13 @@ OP_TYPE_MAP = {
     "fusedaddlayernorm": "FusedAddLayerNorm",
     "fusedscalesoftmax": "FusedScaleSoftmax",
     "fusedattention": "FusedAttention",
+    "gather": "Gather",
+    "slice": "Slice",
+    "reshape": "Reshape",
+    "transpose": "Transpose",
+    "maskedfill": "MaskedFill",
+    "broadcast": "Broadcast",
+    "cast": "Cast",
 }
 
 FOLDABLE_OPS = {"Scale", "Add", "Mul", "Sub", "MatMul"}
@@ -39,7 +48,35 @@ COMMUTATIVE_OPS = {"Add", "Mul"}
 # (op_type, inputs) signature cannot capture must never be CSE'd - Q/K/V
 # projections share inputs but must stay distinct.
 PARAMETERIZED_OPS = {"MatMul", "GEMM", "LinearGELU", "LinearRelu",
-                     "FusedAttention"}
+                     "FusedAttention", "Gather"}
+
+# Semantic attributes that make two otherwise-identical signatures
+# distinct (two LayerNorms share inputs but have different gamma/beta;
+# two Slices share inputs but cut different ranges).
+SEMANTIC_ATTRS = (
+    "factor", "start", "stop", "step", "axis", "squeeze", "dims",
+    "shape_arg", "fill_value", "where", "eps", "weight", "bias", "value",
+)
+
+
+def _semantic_sig(data):
+    """Hash the semantic attrs of a node (empty string when none)."""
+    import zlib
+
+    parts = []
+    for key in SEMANTIC_ATTRS:
+        if key not in data:
+            continue
+        value = data[key]
+        if isinstance(value, np.ndarray):
+            parts.append(
+                (key, value.shape, zlib.crc32(
+                    np.ascontiguousarray(value).tobytes()
+                ))
+            )
+        else:
+            parts.append((key, repr(value)))
+    return repr(parts)
 ELEMENTWISE_OPS = {
     "Add", "Mul", "Sub", "Scale", "Softmax", "LayerNorm", "GELU",
     "Relu", "Identity", "FusedAddLayerNorm", "FusedScaleSoftmax",
@@ -194,9 +231,10 @@ def _eliminate_common_subexpressions(graph):
                 continue
             preds = list(graph.graph.predecessors(node))
             if op_type in COMMUTATIVE_OPS:
-                signature = (op_type, tuple(sorted(preds)))
+                signature = (op_type, tuple(sorted(preds)),
+                             _semantic_sig(data))
             else:
-                signature = (op_type, tuple(preds))
+                signature = (op_type, tuple(preds), _semantic_sig(data))
             if signature in seen and graph.graph.has_node(node):
                 canonical = seen[signature]
                 for succ in list(graph.graph.successors(node)):

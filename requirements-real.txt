@@ -1,0 +1,7 @@
+# Optional dependencies for importing REAL LLM computation graphs
+# (HuggingFace models traced with torch.fx). The CPU torch wheel keeps the
+# download small; the first run of each model downloads its weights.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0
+transformers==4.46.3
+huggingface-hub<1.0

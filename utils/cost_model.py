@@ -28,6 +28,15 @@ OP_LATENCY_US = {
     "Relu": 45.0,
     "LinearRelu": 940.0,
     "Identity": 20.0,
+    "Gather": 60.0,
+    "Slice": 15.0,
+    "Reshape": 5.0,
+    "Transpose": 8.0,
+    "MaskedFill": 20.0,
+    "Broadcast": 5.0,
+    "Cast": 6.0,
+    "Tanh": 45.0,
+    "Pow": 60.0,
 }
 
 OP_MEMORY_MB = {
@@ -49,7 +58,20 @@ OP_MEMORY_MB = {
     "Relu": 16.0,
     "LinearRelu": 115.0,
     "Identity": 16.0,
+    "Gather": 40.0,
+    "Slice": 12.0,
+    "Reshape": 2.0,
+    "Transpose": 4.0,
+    "MaskedFill": 12.0,
+    "Broadcast": 2.0,
+    "Cast": 3.0,
+    "Tanh": 16.0,
+    "Pow": 16.0,
 }
+
+# Pure shape bookkeeping: real runtimes execute these as views with no
+# kernel launch, so they must not count toward kernel-launch metrics.
+VIEW_OPS = {"Reshape", "Cast", "Broadcast", "Identity"}
 
 DEFAULT_LATENCY_US = 150.0
 DEFAULT_MEMORY_MB = 40.0
@@ -64,8 +86,12 @@ def get_op_memory(op_type):
 
 
 def kernel_launches(graph):
-    """Each operator node surviving into the final graph = one launch."""
-    return graph.node_count()
+    """Each non-view operator surviving into the final graph = one launch."""
+    return sum(
+        1
+        for _, data in graph.nodes(data=True)
+        if data.get("op_type") not in VIEW_OPS
+    )
 
 
 def sequential_latency_us(graph):
