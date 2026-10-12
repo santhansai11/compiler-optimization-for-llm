@@ -67,14 +67,20 @@ class LearnedOptimizerTests(unittest.TestCase):
                                       partition_mode="latency")
             self.assertEqual(D(four) < D(one) * 0.9, gains)
 
-    def test_trained_model_picks_devices_by_width(self):
+    def test_trained_model_near_oracle_and_beats_fixed_on_wide_graph(self):
         from search import learned_optimizer as lo
         if not lo.WEIGHTS_PATH.exists():
             self.skipTest("learned optimizer not trained")
         opt = lo.LearnedOptimizer.load()
-        wide = opt.plan(ARCHITECTURES["MoE Transformer (parallel experts)"]())
-        chain = opt.plan(ARCHITECTURES["Pre-LN Transformer (GPT-style)"]())
-        self.assertGreater(wide["action"][3], chain["action"][3])
+        fixed = lo.ACTIONS.index((True, True, True, 1))
+        for name in ("MoE Transformer (parallel experts)",
+                     "Pre-LN Transformer (GPT-style)"):
+            g = ARCHITECTURES[name]()
+            true = lo.evaluate_actions(g)
+            got = true[lo.ACTIONS.index(tuple(opt.plan(g)["action"]))]
+            self.assertGreaterEqual(got, max(true) * 0.95, name)
+            if name.startswith("MoE"):
+                self.assertGreater(got, true[fixed] * 1.3)
 
 
 if __name__ == "__main__":
