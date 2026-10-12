@@ -11,7 +11,7 @@ python -m unittest discover -s tests -t .   # correctness tests
 python tools/make_diagrams.py               # regenerate figures in docs/diagrams
 ```
 
-Requires Python 3.12 and Node.js. (`requirements.txt` includes torch and jax for the FX/XLA tabs.)
+Requires Python 3.12 and Node.js. (`requirements.txt` includes torch and jax for the FX/XLA tabs.) The old MNIST path (`training/train.py`) additionally needs `pip install torchvision`; the GUI does not use it.
 
 ## The passes (the three required algorithms + two extras)
 
@@ -33,16 +33,17 @@ Post-LN Transformer (2 and 4 blocks), Pre-LN (GPT-2 style), Post-LN+ReLU, **LLaM
 
 Inference latency, throughput, speedup, peak GPU memory, Graph Reduction Ratio (GRR), model accuracy preservation, Operator Merge Ratio (OMR), Attention Canonicalization Rate (ACR), kernel-launch reduction, compilation time — computed in `utils/metrics.py`, shown in the GUI Overview tab and exported to Excel (`utils/reports.py`).
 
-Sample result (batch 4, seq 32, d_model 64, all passes except partitioning):
+Sample result (batch 4, seq 32, d_model 64; normalization + canonicalization + merging + DAGS, no partitioning; measured column varies ±10% run to run):
 
 | Architecture | Nodes | GRR | OMR | ACR | Launch red. | Speedup meas. | Speedup model | Accuracy |
 |---|---|---|---|---|---|---|---|---|
-| Post-LN Transformer (2 blocks) | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.24× | 1.73× | PASS |
-| Post-LN Transformer (4 blocks) | 76 → 24 | 68.4% | 27.6% | 100% | 66.7% | 1.26× | 1.76× | PASS |
-| Pre-LN Transformer (GPT-2 style) | 36 → 16 | 55.6% | 22.2% | 100% | 55.6% | 1.17× | 1.67× | PASS |
-| Post-LN + ReLU FFN | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.26× | 1.74× | PASS |
-| LLaMA-style (RMSNorm + SwiGLU) | 37 → 22 | 40.5% | 8.1% | 100% | 40.5% | 1.15× | 1.71× | PASS |
-| MLP classifier (784-256-64-10) | 13 → 5 | 61.5% | 38.5% | N/A | 61.5% | 1.07× | 1.08× | PASS |
+| Post-LN Transformer | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.18× | 1.73× | PASS |
+| Pre-LN Transformer (GPT-style) | 36 → 16 | 55.6% | 22.2% | 100% | 55.6% | 1.12× | 1.67× | PASS |
+| Post-LN + ReLU FFN | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.22× | 1.74× | PASS |
+| LLaMA-style (RMSNorm + SwiGLU) | 37 → 22 | 40.5% | 8.1% | 100% | 40.5% | 1.14× | 1.71× | PASS |
+| MoE Transformer (parallel experts) | 53 → 32 | 39.6% | 17.0% | 100% | 39.6% | 1.03× | 2.75× | PASS |
+| Multi-head Transformer (parallel heads) | 75 → 24 | 68.0% | 4.0% | 100% | 68.0% | 1.11× | 4.55× | PASS |
+| MLP classifier | 13 → 5 | 61.5% | 38.5% | N/A | 61.5% | 1.06× | 1.08× | PASS |
 
 ### How to read the numbers (honest limitations)
 
