@@ -192,10 +192,128 @@ def create_llama_style_graph(num_blocks=2, batch=4, seq=32, d_model=64):
     return graph
 
 
+def create_moe_graph(num_blocks=2, batch=4, seq=32, d_model=64, experts=4):
+    """Dense mixture-of-experts Transformer (Mixtral-like layout).
+
+    Each block replaces the single feed-forward network with ``experts``
+    parallel expert FFNs whose outputs are averaged. Routing/top-k gating
+    is omitted from this IR sketch (all experts run, equal weights), but
+    the *wide parallel structure* is what matters to the optimizer.
+    """
+    graph = ComputationGraph(f"moe_{num_blocks}b_{experts}e")
+    graph.meta["config"] = {"batch": batch, "seq": seq, "d_model": d_model}
+    scale_factor = float(1.0 / np.sqrt(d_model))
+
+    graph.add_operation("Input", "Input")
+    node = "Input"
+    for i in range(1, num_blocks + 1):
+        p = f"Block{i}"
+        graph.add_operation(f"{p}_LN1", "LayerNorm")
+        graph.add_dependency(node, f"{p}_LN1")
+        for role in ("Q", "K", "V"):
+            graph.add_operation(f"{p}_{role}_Projection", "MatMul")
+            graph.add_dependency(f"{p}_LN1", f"{p}_{role}_Projection")
+        graph.add_operation(f"{p}_QK_Score", "MatMul", transpose_rhs=True)
+        graph.add_dependency(f"{p}_Q_Projection", f"{p}_QK_Score")
+        graph.add_dependency(f"{p}_K_Projection", f"{p}_QK_Score")
+        graph.add_operation(f"{p}_Scale", "Scale", factor=scale_factor)
+        graph.add_dependency(f"{p}_QK_Score", f"{p}_Scale")
+        graph.add_operation(f"{p}_Softmax", "Softmax")
+        graph.add_dependency(f"{p}_Scale", f"{p}_Softmax")
+        graph.add_operation(f"{p}_Attention_Output", "MatMul")
+        graph.add_dependency(f"{p}_Softmax", f"{p}_Attention_Output")
+        graph.add_dependency(f"{p}_V_Projection", f"{p}_Attention_Output")
+        graph.add_operation(f"{p}_Attn_Residual", "Add")
+        graph.add_dependency(f"{p}_Attention_Output", f"{p}_Attn_Residual")
+        graph.add_dependency(node, f"{p}_Attn_Residual")
+
+        graph.add_operation(f"{p}_LN2", "LayerNorm")
+        graph.add_dependency(f"{p}_Attn_Residual", f"{p}_LN2")
+        graph.add_operation(f"{p}_Experts_Sum", "Add")
+        for e in range(experts):
+            fc1, act, fc2 = (f"{p}_E{e}_FC1", f"{p}_E{e}_GELU", f"{p}_E{e}_FC2")
+            graph.add_operation(fc1, "MatMul")
+            graph.add_operation(act, "GELU")
+            graph.add_operation(fc2, "MatMul")
+            graph.add_dependency(f"{p}_LN2", fc1)
+            graph.add_dependency(fc1, act)
+            graph.add_dependency(act, fc2)
+            graph.add_dependency(fc2, f"{p}_Experts_Sum")
+        graph.add_operation(f"{p}_Experts_Mean", "Scale", factor=1.0 / experts)
+        graph.add_dependency(f"{p}_Experts_Sum", f"{p}_Experts_Mean")
+        graph.add_operation(f"{p}_FFN_Residual", "Add")
+        graph.add_dependency(f"{p}_Experts_Mean", f"{p}_FFN_Residual")
+        graph.add_dependency(f"{p}_Attn_Residual", f"{p}_FFN_Residual")
+        node = f"{p}_FFN_Residual"
+
+    graph.add_operation("Final_LayerNorm", "LayerNorm")
+    graph.add_dependency(node, "Final_LayerNorm")
+    graph.add_operation("Logits", "MatMul", is_output=True)
+    graph.add_dependency("Final_LayerNorm", "Logits")
+    return graph
+
+
+def create_multihead_graph(num_blocks=2, batch=4, seq=32, d_model=64, heads=4):
+    """Pre-LN Transformer with ``heads`` explicit parallel attention heads.
+
+    Every head has its own Q/K/V projections and attention chain; head
+    outputs are summed (a stand-in for concat + output projection).
+    """
+    graph = ComputationGraph(f"multihead_{num_blocks}b_{heads}h")
+    graph.meta["config"] = {"batch": batch, "seq": seq, "d_model": d_model}
+    scale_factor = float(1.0 / np.sqrt(d_model))
+    graph.add_operation("Input", "Input")
+    node = "Input"
+    for i in range(1, num_blocks + 1):
+        p = f"Block{i}"
+        graph.add_operation(f"{p}_LN1", "LayerNorm")
+        graph.add_dependency(node, f"{p}_LN1")
+        graph.add_operation(f"{p}_Heads_Sum", "Add")
+        for h in range(heads):
+            q, k, v, sc, ss, sm, av = (f"{p}_H{h}_{x}" for x in
+                                       ("Q", "K", "V", "QK", "Scale", "Softmax", "AV"))
+            for name in (q, k, v):
+                graph.add_operation(name, "MatMul")
+                graph.add_dependency(f"{p}_LN1", name)
+            graph.add_operation(sc, "MatMul", transpose_rhs=True)
+            graph.add_dependency(q, sc)
+            graph.add_dependency(k, sc)
+            graph.add_operation(ss, "Scale", factor=scale_factor)
+            graph.add_dependency(sc, ss)
+            graph.add_operation(sm, "Softmax")
+            graph.add_dependency(ss, sm)
+            graph.add_operation(av, "MatMul")
+            graph.add_dependency(sm, av)
+            graph.add_dependency(v, av)
+            graph.add_dependency(av, f"{p}_Heads_Sum")
+        graph.add_operation(f"{p}_Attn_Residual", "Add")
+        graph.add_dependency(f"{p}_Heads_Sum", f"{p}_Attn_Residual")
+        graph.add_dependency(node, f"{p}_Attn_Residual")
+        graph.add_operation(f"{p}_LN2", "LayerNorm")
+        graph.add_dependency(f"{p}_Attn_Residual", f"{p}_LN2")
+        graph.add_operation(f"{p}_FFN_Linear", "MatMul")
+        graph.add_dependency(f"{p}_LN2", f"{p}_FFN_Linear")
+        graph.add_operation(f"{p}_GELU", "GELU")
+        graph.add_dependency(f"{p}_FFN_Linear", f"{p}_GELU")
+        graph.add_operation(f"{p}_FFN_Output", "MatMul")
+        graph.add_dependency(f"{p}_GELU", f"{p}_FFN_Output")
+        graph.add_operation(f"{p}_FFN_Residual", "Add")
+        graph.add_dependency(f"{p}_FFN_Output", f"{p}_FFN_Residual")
+        graph.add_dependency(f"{p}_Attn_Residual", f"{p}_FFN_Residual")
+        node = f"{p}_FFN_Residual"
+    graph.add_operation("Final_LayerNorm", "LayerNorm")
+    graph.add_dependency(node, "Final_LayerNorm")
+    graph.add_operation("Logits", "MatMul", is_output=True)
+    graph.add_dependency("Final_LayerNorm", "Logits")
+    return graph
+
+
 ARCHITECTURES = {
     "Post-LN Transformer": create_postln_transformer_graph,
     "Pre-LN Transformer (GPT-style)": create_preln_transformer_graph,
     "Post-LN + ReLU FFN": create_relu_transformer_graph,
     "LLaMA-style (RMSNorm + SwiGLU)": create_llama_style_graph,
+    "MoE Transformer (parallel experts)": create_moe_graph,
+    "Multi-head Transformer (parallel heads)": create_multihead_graph,
     "MLP classifier": create_mlp_classifier_graph,
 }

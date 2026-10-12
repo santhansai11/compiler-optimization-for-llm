@@ -146,3 +146,38 @@ def live_range_peak_memory_mb(graph):
             ):
                 alive -= get_op_memory(graph.op_type(pred))
     return peak
+
+
+# ----------------------------------------------------------------------
+# Multi-device deployment model (used by the learned optimizer)
+# ----------------------------------------------------------------------
+# Assumed cost of moving one tensor between devices (link latency + a
+# small activation). This is a modeling assumption, not a measurement.
+COMM_US = 150.0
+
+
+def deployment_latency_us(graph):
+    """Makespan of the graph on D devices (D = number of partitions).
+
+    Each device runs its kernels one after another (large kernels saturate
+    a GPU); a kernel starts once its device is free and every input has
+    arrived, paying ``COMM_US`` for inputs produced on another device.
+    With no partition annotation this is exactly the sequential latency,
+    so parallel branches only pay off when split across devices - and
+    splitting a chain only adds communication.
+    """
+    g = graph.graph
+    order = graph.topological_order()
+    if all("schedule_order" in g.nodes[n] for n in order):
+        order = sorted(order, key=lambda n: g.nodes[n]["schedule_order"])
+    device = {n: g.nodes[n].get("partition", 0) for n in order}
+    free, finish = {}, {}
+    for node in order:
+        d = device[node]
+        ready = max((finish[p] + (COMM_US if device[p] != d else 0.0)
+                     for p in g.predecessors(node)), default=0.0)
+        start = max(free.get(d, 0.0), ready)
+        finish[node] = start + get_op_latency(g.nodes[node].get("op_type")) \
+            + LAUNCH_OVERHEAD_US
+        free[d] = finish[node]
+    return max(finish.values(), default=0.0)

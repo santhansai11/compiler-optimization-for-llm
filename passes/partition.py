@@ -23,6 +23,67 @@ def partition_hypergraph(graph, num_partitions=2):
     return _partition(graph, num_partitions, mode="hypergraph")
 
 
+def partition_latency_aware(graph, num_partitions=2):
+    """Latency-aware k-way placement (HEFT-style list scheduling).
+
+    Ops are visited in decreasing upward rank (longest remaining path,
+    including transfer cost) and each is placed on the device where it can
+    *finish earliest* given device availability and cross-device transfers.
+    Unlike community-based cuts this pass optimises makespan directly, so it
+    keeps a chain on one device and only spreads genuinely parallel work.
+    Also records the visit order as ``schedule_order``.
+    """
+    from utils.cost_model import COMM_US, LAUNCH_OVERHEAD_US, get_op_latency
+
+    started = time.perf_counter()
+    work = graph.copy()
+    g = work.graph
+    k = max(1, int(num_partitions))
+    lat = {n: get_op_latency(d.get("op_type")) + LAUNCH_OVERHEAD_US
+           for n, d in g.nodes(data=True)}
+    rank = {}
+    for n in reversed(work.topological_order()):
+        rank[n] = lat[n] + max(
+            (COMM_US + rank[s] for s in g.successors(n)), default=0.0)
+    order = sorted(g.nodes(), key=lambda n: (-rank[n], n))
+
+    avail = [0.0] * k
+    device, finish = {}, {}
+    for position, n in enumerate(order):
+        best = None
+        for d in range(k):
+            ready = max((finish[p] + (COMM_US if device[p] != d else 0.0)
+                         for p in g.predecessors(n)), default=0.0)
+            eft = max(avail[d], ready) + lat[n]
+            if best is None or eft < best[0] - 1e-9:
+                best = (eft, d)
+        finish[n], device[n] = best
+        avail[best[1]] = best[0]
+        g.nodes[n]["partition"] = best[1]
+        g.nodes[n]["schedule_order"] = position
+
+    used = sorted(set(device.values()))
+    remap = {d: i for i, d in enumerate(used)}
+    for n in g.nodes():
+        g.nodes[n]["partition"] = remap[device[n]]
+    sizes = [sum(1 for n in g.nodes() if g.nodes[n]["partition"] == i)
+             for i in range(len(used))]
+    info = {
+        "pass": "latency_aware_partitioning",
+        "mode": "latency",
+        "requested_partitions": k,
+        "partitions": len(used),
+        "partition_sizes": sizes,
+        "balance_ratio": max(sizes) / min(sizes) if sizes and min(sizes) else 1.0,
+        "cut_edges": sum(1 for u, v in g.edges()
+                         if g.nodes[u]["partition"] != g.nodes[v]["partition"]),
+        "estimated_makespan_us": max(finish.values(), default=0.0),
+        "duration_s": time.perf_counter() - started,
+    }
+    work.meta["partition"] = info
+    return work, info
+
+
 def _partition(graph, num_partitions, mode):
     started = time.perf_counter()
     work = graph.copy()

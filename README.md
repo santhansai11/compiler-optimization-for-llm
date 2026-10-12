@@ -51,7 +51,27 @@ Sample result (batch 4, seq 32, d_model 64, all passes except partitioning):
 * Kernel-launch reduction counts surviving operator nodes; it is a proxy, not a profiler reading.
 * The PyTorch FX attention benchmark (`run_attention_optimization.py`) reduces nodes 11→4 but runs the same math, so its speedup is ≈1.0×. The JAX/XLA comparison (`xla_compare.py`) is CPU-only and uses separate equivalent code.
 * The model graphs are templates with synthetic weights/inputs; accuracy preservation means output equivalence, not task accuracy.
-* No dataset is needed: the optimizer sees shapes and operations only. PassNet / WikiText are noted as future work for learned-search training (`search/`, `training/` are earlier prototypes).
+* The learned optimizer trains on generated graphs with cost-model labels (see above); PassNet-style real-graph data with measured GPU labels is future work. `search/gnn*.py`, `search/rl.py`, `search/neuro_symbolic.py` are older prototypes.
+
+## Learned optimizer (GNN plan selection)
+
+`search/learned_optimizer.py` — the rewrite rules stay symbolic (so outputs are provably preserved), but **which passes to run and across how many devices to place the graph is learned**.
+
+* **Action space:** 8 pass subsets (normalize / canonicalize / merge) × 1–4 devices = 32 plans. Multi-device placement uses the new latency-aware (HEFT-style) partitioner in `passes/partition.py`.
+* **Reward (modeled):** deployment speedup − 0.15·(devices − 1) − 0.005·(#passes), from `utils/cost_model.deployment_latency_us` (hand-written op costs + an assumed 150 µs per cross-device transfer). Not measured on a GPU.
+* **Data:** 700 generated graphs (7 families × 100: Post-LN, Pre-LN, ReLU, LLaMA, MoE, multi-head, MLP; random depth/width and injected redundant ops). Each graph is labelled by actually running all 32 plans.
+* **Model:** directed message-passing GNN (3 layers, 64 hidden) → predicted reward of all 32 plans → pick the argmax.
+* **Evaluation:** leave-one-family-out (train on 6 families, test on the unseen 7th).
+
+| Mean over held-out families | Reward |
+|---|---|
+| No passes | 1.00 |
+| Fixed pipeline, 1 device (old default) | 1.48 |
+| Fixed pipeline, 4 devices | 1.76 |
+| **Learned plan** | **1.81** |
+| Oracle (best of 32) | 1.86 |
+
+Mean regret vs oracle 3.3%; within 2% of oracle on 70% of graphs. Large gains on the wide families (MoE 2.05 vs 1.20, multi-head 3.50 vs 1.89 fixed) even when held out; weakest on the MLP family (10.8% regret) and LLaMA (5.9%). Caveats: MoE and multi-head are structurally similar to each other, so each helps the other generalize; rewards come from the cost model, so the model learns that cost model; exact-plan match is only 21% (many plans are near-ties). Retrain: `python -m search.learned_optimizer train` (~1 min). Results: `docs/results/learned_results.json`; GUI tab "Learned optimizer".
 
 ## Trained model experiment (Tiny Shakespeare)
 
@@ -65,7 +85,7 @@ Sample result (batch 4, seq 32, d_model 64, all passes except partitioning):
 | Identical top-1 next-character predictions | 100% |
 | Next-char NLL: PyTorch vs compiled | 1.4985 vs 1.4985 |
 
-Only the model is trained; the compiler passes remain rule-based. The tiny model has a single attention head (the IR has no head-split/concat ops).
+Here the *model* is trained; the plan-selection above is the separate learned optimizer. The tiny model has a single attention head (the IR has no head-split/concat ops).
 
 ## GUI tabs
 

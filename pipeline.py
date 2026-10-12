@@ -5,13 +5,15 @@ import time
 from passes.canonicalize import canonicalize_attention
 from passes.merge import merge_operators
 from passes.normalize import normalize_graph
-from passes.partition import partition_graph, partition_hypergraph
+from passes.partition import (partition_graph, partition_hypergraph,
+                              partition_latency_aware)
 from passes.schedule import schedule_graph
 
 
 def run_pipeline(graph, normalize=True, canonicalize=True, merge=True,
                  schedule=True, partition=False, hypergraph=False,
-                 num_partitions=2, neuro_symbolic=False):
+                 num_partitions=2, neuro_symbolic=False,
+                 partition_mode=None):
     """Run the selected passes in compiler order.
 
     Returns ``(optimized_graph, infos, compile_time_s)`` where ``infos``
@@ -49,7 +51,10 @@ def run_pipeline(graph, normalize=True, canonicalize=True, merge=True,
         current, infos["dags"] = schedule_graph(current)
 
     if partition:
-        partition_fn = partition_hypergraph if hypergraph else partition_graph
+        mode = partition_mode or ("hypergraph" if hypergraph else "graph")
+        partition_fn = {"graph": partition_graph,
+                        "hypergraph": partition_hypergraph,
+                        "latency": partition_latency_aware}[mode]
         current, infos["partitioning"] = partition_fn(
             current, num_partitions
         )

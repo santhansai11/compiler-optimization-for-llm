@@ -159,6 +159,7 @@ function App() {
   const [archs, setArchs] = useState(null)
   const [ablation, setAblation] = useState(null)
   const [busy, setBusy] = useState('')
+  const [learned, setLearned] = useState(null)
 
   useEffect(() => {
     api('status').then(() => setHealth('online')).catch(() => setHealth('offline'))
@@ -191,6 +192,7 @@ function App() {
     setSweep(null)
     setArchs(null)
     setAblation(null)
+    setLearned(null)
     setReport(null)
     setActiveTab('overview')
     const payload = {
@@ -237,6 +239,19 @@ function App() {
   async function loadAblation() {
     setBusy('ablation'); setError('')
     try { setAblation(await api('ablation', { ...workload, model_id: modelId })) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  async function askLearned() {
+    setBusy('learned'); setError('')
+    try { setLearned(await api('learned', { ...workload, model_id: modelId })) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  function applyLearned() {
+    if (!learned) return
+    setPasses({ ...learned.chosen.flags })
+    setPartitionMode('latency')
+    setNumPartitions(Math.max(2, learned.chosen.devices))
+    setActiveTab('overview')
   }
 
   async function exportArchitectures() {
@@ -307,7 +322,7 @@ function App() {
 
         <section className="passes-row"><span className="passes-label">PASSES</span>
           {[['normalize', 'Graph normalization'], ['canonicalize', 'Attention canonicalization'], ['merge', 'Semantic operator merging'], ['schedule', 'DAGS scheduling'], ['partition', 'Graph partitioning']].map(([key, label]) => <button type="button" key={key} className={`pass-chip ${passes[key] ? 'selected' : ''}`} aria-pressed={passes[key]} onClick={() => setPasses((value) => ({ ...value, [key]: !value[key] }))}><span className="pass-check">{passes[key] && <Check size={11} />}</span>{label}</button>)}
-          {passes.partition && <span className="partition-opts"><select aria-label="Partition mode" value={partitionMode} onChange={(event) => setPartitionMode(event.target.value)}><option value="graph">Graph cut</option><option value="hypergraph">Hypergraph</option></select><input aria-label="Partitions" type="number" min="2" max="8" value={numPartitions} onChange={(event) => setNumPartitions(event.target.value)} /></span>}
+          {passes.partition && <span className="partition-opts"><select aria-label="Partition mode" value={partitionMode} onChange={(event) => setPartitionMode(event.target.value)}><option value="graph">Graph cut</option><option value="hypergraph">Hypergraph</option><option value="latency">Latency-aware (HEFT)</option></select><input aria-label="Partitions" type="number" min="2" max="8" value={numPartitions} onChange={(event) => setNumPartitions(event.target.value)} /></span>}
           <span className="passes-note">Toggle passes, then run · same weights · CPU reference</span></section>
 
         {health === 'offline' && <div className="notice notice-error"><CircleAlert size={17} /> Backend API is offline. Start the Python API and React development server with <code>./run.sh</code> (macOS/Linux) or <code>run-server.bat</code> (Windows).</div>}
@@ -316,7 +331,7 @@ function App() {
         {result && <>
           <nav className="tabs-nav" aria-label="Dashboard sections">
             {[
-              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
+              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['learned', 'Learned optimizer', Zap], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
             ].map(([id, label, Icon]) => <button key={id} className={`tab-btn ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id)}><Icon size={16} />{label}{id === 'xla' && xla?.all_correct && <span className="tab-check"><Check size={11} /></span>}</button>)}
             {report && <a className="download-btn" href={report.download_url}><Download size={15} /> Download XLSX</a>}
           </nav>
@@ -387,6 +402,25 @@ function App() {
               </div>
               <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Configuration</th><th>Nodes</th><th>GRR</th><th>OMR</th><th>Launch red.</th><th>Modeled speedup</th><th>GPU memory</th><th>Accuracy</th></tr></thead><tbody>{ablation.rows.map((row) => <tr key={row.name}><td>{row.name}</td><td>{row.nodes_original} → {row.nodes_optimized}</td><td>{row.grr.toFixed(1)}%</td><td>{row.omr.toFixed(1)}%</td><td>{row.klr.toFixed(1)}%</td><td>{row.modeled_speedup.toFixed(2)}×</td><td>{row.gpu_memory_optimized_mb.toFixed(0)} MB</td><td className={row.accuracy_preserved ? 'correct-cell' : 'incorrect-cell'}>{row.accuracy_preserved ? 'PASS' : 'CHECK'}</td></tr>)}</tbody></table></div></div>
             </> : <div className="panel xla-empty"><div className="empty-icon"><Layers3 size={22} /></div><h3>Run the ablation</h3><p>Compare each pass in isolation against the full pipeline.</p></div>}
+          </div>}
+
+          {activeTab === 'learned' && <div className="dashboard animate-fade">
+            <div className="section-intro"><div><div className="eyebrow">GNN-GUIDED PLAN · RULES STAY SYMBOLIC</div><h2>Let a learned model choose the passes and device count</h2><p>A graph neural network reads the DAG and predicts the reward of 32 plans (which passes × 1–4 devices). Rewrites remain rule-based, so outputs stay identical. Rewards are modeled, not measured on a GPU.</p></div><div className="sweep-actions"><button className="btn-secondary" onClick={askLearned} disabled={busy === 'learned'}>{busy === 'learned' ? <RefreshCw size={15} className="spin" /> : <Zap size={15} />}{busy === 'learned' ? 'Thinking…' : `Ask for ${result.model_name}`}</button>{learned && <button className="btn-primary" onClick={applyLearned}>Apply plan to controls</button>}</div></div>
+            {learned ? <>
+              <div className="metrics-grid">
+                <MetricCard label="Learned plan" value={learned.chosen.label} foot={`predicted ${learned.chosen.predicted_reward.toFixed(2)}`} icon={Zap} tone="purple" />
+                <MetricCard label="Reward · learned" value={learned.chosen.true_reward.toFixed(2)} foot="true value of the chosen plan" icon={Gauge} tone="green" />
+                <MetricCard label="Reward · fixed pipeline" value={learned.fixed_pipeline.true_reward.toFixed(2)} foot={learned.fixed_pipeline.label} icon={Layers3} />
+                <MetricCard label="Reward · oracle" value={learned.oracle.true_reward.toFixed(2)} foot={learned.oracle.label} icon={Check} tone="cyan" />
+              </div>
+              <div className="metric-note"><Braces size={15} /> Reward = {learned.reward_definition}.</div>
+              <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Top plans by predicted reward</th><th>Predicted</th><th>True</th></tr></thead><tbody>{learned.top_predicted.map((row) => <tr key={row.label}><td>{row.label}</td><td>{row.predicted.toFixed(2)}</td><td>{row.true.toFixed(2)}</td></tr>)}</tbody></table></div></div>
+              {learned.training?.lofo_mean && <>
+                <div className="section-intro"><div><div className="eyebrow">TRAINING EVIDENCE</div><h2>Held-out architecture families</h2><p>Each family was excluded from training and then evaluated ({learned.training.graphs_per_family} generated graphs each). Mean regret vs oracle: {learned.training.lofo_mean.regret_pct.toFixed(1)}%.</p></div></div>
+                <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Held-out family</th><th>No passes</th><th>Fixed 1 dev</th><th>Fixed 4 dev</th><th>Learned</th><th>Oracle</th><th>Regret</th></tr></thead><tbody>{Object.entries(learned.training.leave_one_family_out).map(([fam, r]) => <tr key={fam}><td>{fam}</td><td>{r.no_passes.toFixed(2)}</td><td>{r.fixed_pipeline_1dev.toFixed(2)}</td><td>{r.fixed_pipeline_4dev.toFixed(2)}</td><td><b>{r.learned.toFixed(2)}</b></td><td>{r.oracle.toFixed(2)}</td><td>{r.regret_pct.toFixed(1)}%</td></tr>)}</tbody></table></div></div>
+                <figure className="panel diagram-card"><figcaption>Leave-one-family-out results</figcaption><img src="/diagrams/fig_learned_optimizer.png" alt="Learned optimizer results" /></figure>
+              </>}
+            </> : <div className="panel xla-empty"><div className="empty-icon"><Zap size={22} /></div><h3>Ask the learned optimizer</h3><p>It predicts the best plan for the selected model without trying all 32.</p></div>}
           </div>}
 
           {activeTab === 'diagrams' && <div className="dashboard animate-fade">

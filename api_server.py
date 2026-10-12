@@ -29,6 +29,8 @@ from models.architectures import (
     create_preln_transformer_graph,
     create_relu_transformer_graph,
     create_llama_style_graph,
+    create_moe_graph,
+    create_multihead_graph,
     create_mlp_classifier_graph,
 )
 from models.operations import OPERATION_DEMOS
@@ -46,6 +48,7 @@ from utils.cost_model import (
     naive_peak_memory_mb,
     live_range_peak_memory_mb,
     kernel_launches,
+    deployment_latency_us,
 )
 from utils.executor import execute
 
@@ -67,6 +70,12 @@ MODEL_REGISTRY = {
     "llama_2b": ("LLaMA-style (RMSNorm + SwiGLU)",
                  lambda b, s, d: create_llama_style_graph(2, b, s, d),
                  "RMSNorm, gated SwiGLU feed-forward, no biases"),
+    "moe_2b": ("MoE Transformer (2 blocks, 4 experts)",
+               lambda b, s, d: create_moe_graph(2, b, s, d, experts=4),
+               "Parallel expert FFNs (Mixtral-like, dense routing)"),
+    "multihead_2b": ("Multi-head Transformer (2 blocks, 4 heads)",
+                     lambda b, s, d: create_multihead_graph(2, b, s, d, heads=4),
+                     "Explicit parallel attention heads"),
     "mlp_classifier": ("MLP classifier (784-256-64-10)",
                        lambda b, s, d: create_mlp_classifier_graph(batch=256),
                        "Plain feed-forward network (random weights)"),
@@ -79,6 +88,7 @@ if LM_WEIGHTS.exists():
 for _id, (_name, _builder, _desc) in OPERATION_DEMOS.items():
     MODEL_REGISTRY[_id] = (_name, (lambda f: lambda b, s, d: f(b, s, d))(_builder), _desc)
 
+_LEARNED = None
 DEFAULT_PASSES = {"normalize": True, "canonicalize": True, "merge": True,
                   "schedule": True, "partition": False}
 STAGE_ORDER = [
@@ -97,15 +107,16 @@ def _passes_from(data):
     return flags
 
 
-def _run(graph, flags, num_partitions=2, hypergraph=False):
+def _run(graph, flags, num_partitions=2, hypergraph=False, mode=None):
+    """``hypergraph`` is kept for older callers; ``mode`` wins when given."""
     return run_pipeline(
         graph, normalize=flags["normalize"], canonicalize=flags["canonicalize"],
         merge=flags["merge"], schedule=flags["schedule"],
         partition=flags["partition"], hypergraph=hypergraph,
-        num_partitions=num_partitions)
+        num_partitions=num_partitions, partition_mode=mode)
 
 
-def _stage_table(graph, flags, num_partitions, hypergraph):
+def _stage_table(graph, flags, num_partitions, hypergraph, mode=None):
     """Cumulative per-pass table: nodes, launches and modeled latency."""
     rows = [{"stage": "Original graph", "ops": graph.node_count(),
              "launches": kernel_launches(graph),
@@ -115,7 +126,7 @@ def _stage_table(graph, flags, num_partitions, hypergraph):
         if not flags[key]:
             continue
         enabled[key] = True
-        g, _, _ = _run(graph, enabled, num_partitions, hypergraph)
+        g, _, _ = _run(graph, enabled, num_partitions, hypergraph, mode)
         rows.append({"stage": f"+ {label}", "ops": g.node_count(),
                      "launches": kernel_launches(g),
                      "modeled_latency_us": scheduled_latency_us(g)})
@@ -248,6 +259,8 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             self.handle_xla_benchmark(data)
         elif path == "/api/architectures":
             self.handle_architecture_comparison(data)
+        elif path == "/api/learned":
+            self.handle_learned(data)
         elif path == "/api/ablation":
             self.handle_ablation(data)
         elif path == "/api/export_report":
@@ -263,13 +276,15 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
         model_id = data.get("model_id", "postln_2b")
         flags = _passes_from(data)
         num_partitions = max(2, min(8, int(data.get("num_partitions", 2))))
-        hypergraph = data.get("partition_mode", "graph") == "hypergraph"
+        mode = data.get("partition_mode", "graph")
+        mode = mode if mode in ("graph", "hypergraph", "latency") else "graph"
+        hypergraph = False
         batch = int(data.get("batch", 4))
         seq = int(data.get("seq", 32))
         d_model = int(data.get("d_model", 64))
 
         orig_graph = self._get_model_graph(model_id, batch=batch, seq=seq, d_model=d_model)
-        opt_graph, infos, compile_time_s = _run(orig_graph, flags, num_partitions, hypergraph)
+        opt_graph, infos, compile_time_s = _run(orig_graph, flags, num_partitions, hypergraph, mode)
         metrics = compute_metrics(orig_graph, opt_graph, infos, compile_time_s, batch_size=batch)
 
         self._send_json({
@@ -279,7 +294,12 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             "original_graph": graph_to_d3(orig_graph),
             "optimized_graph": graph_to_d3(opt_graph),
             "metrics": metrics,
-            "stages": _stage_table(orig_graph, flags, num_partitions, hypergraph),
+            "stages": _stage_table(orig_graph, flags, num_partitions, hypergraph, mode),
+            "deployment": {
+                "original_us": deployment_latency_us(orig_graph),
+                "optimized_us": deployment_latency_us(opt_graph),
+                "devices": opt_graph.meta.get("partition", {}).get("partitions", 1),
+            },
             "pass_info": infos,
             "schedule_info": opt_graph.meta.get("schedule", {}),
             "partition_info": opt_graph.meta.get("partition", {}),
@@ -298,6 +318,40 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             rows.append({"id": model_id, **_architecture_row(
                 name, builder(batch, seq, d_model), flags, 2, False, batch)})
         self._send_json({"rows": rows, "passes": flags})
+
+    def handle_learned(self, data):
+        """Ask the trained GNN for a plan; compare with fixed + oracle."""
+        from search import learned_optimizer as lo
+
+        if not lo.WEIGHTS_PATH.exists():
+            self._send_json({"error": "Learned optimizer not trained. Run: python -m search.learned_optimizer train"}, status=503)
+            return
+        global _LEARNED
+        if _LEARNED is None:
+            _LEARNED = lo.LearnedOptimizer.load()
+        model_id = data.get("model_id", "postln_2b")
+        graph = self._get_model_graph(model_id, int(data.get("batch", 4)),
+                                      int(data.get("seq", 32)), int(data.get("d_model", 64)))
+        plan = _LEARNED.plan(graph)
+        true = lo.evaluate_actions(graph)
+        chosen = lo.ACTIONS.index(tuple(plan["action"]))
+        fixed = lo.ACTIONS.index((True, True, True, 1))
+        best = max(range(len(true)), key=lambda i: true[i])
+        order = sorted(range(len(true)), key=lambda i: -plan["predicted"][i])[:6]
+        flags, k = lo.action_flags(plan["action"])
+        results = lo.RESULTS_PATH.read_text() if lo.RESULTS_PATH.exists() else "{}"
+        self._send_json({
+            "model_id": model_id,
+            "chosen": {"label": plan["label"], "flags": flags, "devices": k,
+                       "predicted_reward": plan["predicted"][chosen],
+                       "true_reward": true[chosen]},
+            "fixed_pipeline": {"label": lo.action_label(lo.ACTIONS[fixed]), "true_reward": true[fixed]},
+            "oracle": {"label": lo.action_label(lo.ACTIONS[best]), "true_reward": true[best]},
+            "top_predicted": [{"label": lo.action_label(lo.ACTIONS[i]),
+                               "predicted": plan["predicted"][i], "true": true[i]} for i in order],
+            "training": json.loads(results),
+            "reward_definition": f"deployment speedup − {lo.DEVICE_PENALTY}·(devices−1) − {lo.PASS_PENALTY}·(#passes); modeled, not measured",
+        })
 
     def handle_ablation(self, data):
         """Each pass alone, then all together: attributes the gains."""

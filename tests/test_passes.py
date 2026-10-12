@@ -51,5 +51,31 @@ class PassTests(unittest.TestCase):
         self.assertIn("LinearSiLU", infos["semantic_merging"]["fused_types"])
 
 
+class LearnedOptimizerTests(unittest.TestCase):
+    def test_single_device_deployment_equals_sequential(self):
+        from utils.cost_model import deployment_latency_us, sequential_latency_us
+        g = ARCHITECTURES["MoE Transformer (parallel experts)"]()
+        self.assertAlmostEqual(deployment_latency_us(g), sequential_latency_us(g))
+
+    def test_latency_partition_helps_wide_graph_not_chain(self):
+        from utils.cost_model import deployment_latency_us as D
+        wide = ARCHITECTURES["MoE Transformer (parallel experts)"]()
+        chain = ARCHITECTURES["Pre-LN Transformer (GPT-style)"]()
+        for g, gains in ((wide, True), (chain, False)):
+            one, _, _ = run_pipeline(g, partition=False)
+            four, _, _ = run_pipeline(g, partition=True, num_partitions=4,
+                                      partition_mode="latency")
+            self.assertEqual(D(four) < D(one) * 0.9, gains)
+
+    def test_trained_model_picks_devices_by_width(self):
+        from search import learned_optimizer as lo
+        if not lo.WEIGHTS_PATH.exists():
+            self.skipTest("learned optimizer not trained")
+        opt = lo.LearnedOptimizer.load()
+        wide = opt.plan(ARCHITECTURES["MoE Transformer (parallel experts)"]())
+        chain = opt.plan(ARCHITECTURES["Pre-LN Transformer (GPT-style)"]())
+        self.assertGreater(wide["action"][3], chain["action"][3])
+
+
 if __name__ == "__main__":
     unittest.main()
