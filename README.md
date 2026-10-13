@@ -9,7 +9,7 @@ A compiler-style optimizer for LLM computation graphs, inspired by XLA/OpenXLA. 
 ```bash
 ./run.sh            # macOS/Linux: API on :8000, GUI on http://127.0.0.1:5173
 run-server.bat      # Windows (create .venv and install requirements.txt first)
-python -m unittest discover -s tests -t .      # 15 correctness tests
+python -m unittest discover -s tests -t .      # 17 correctness tests
 ```
 
 Python 3.12 + Node.js. `pip install -r requirements.txt` (torch, jax, networkx, openpyxl, matplotlib); `pip install -r requirements-real.txt` adds HuggingFace `transformers` for the real-graph study.
@@ -42,13 +42,13 @@ Hardware for all "real GPU" numbers: **Apple M3 Pro GPU (Metal/MPS)**, torch 2.1
 
 | Architecture | Nodes | GRR | OMR | ACR | Launch red. | Speedup measured (CPU) | Speedup modeled | Output identical |
 |---|---|---|---|---|---|---|---|---|
-| Post-LN Transformer | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.12× | 1.28× | yes |
-| Pre-LN Transformer (GPT-style) | 36 → 16 | 55.6% | 22.2% | 100% | 55.6% | 1.09× | 1.25× | yes |
-| Post-LN + ReLU FFN | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.14× | 1.28× | yes |
-| LLaMA-style (RMSNorm + SwiGLU) | 37 → 22 | 40.5% | 8.1% | 100% | 40.5% | 1.06× | 1.11× | yes |
-| MoE Transformer (parallel experts) | 53 → 32 | 39.6% | 17.0% | 100% | 39.6% | 1.01× | 1.10× | yes |
-| Multi-head Transformer (parallel heads) | 75 → 24 | 68.0% | 4.0% | 100% | 68.0% | 1.08× | 1.15× | yes |
-| MLP classifier | 13 → 5 | 61.5% | 38.5% | N/A | 61.5% | 1.02× | 1.48× | yes |
+| Post-LN Transformer | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.09× | 1.28× | yes |
+| Pre-LN Transformer (GPT-style) | 36 → 16 | 55.6% | 22.2% | 100% | 55.6% | 1.05× | 1.25× | yes |
+| Post-LN + ReLU FFN | 42 → 14 | 66.7% | 26.2% | 100% | 65.0% | 1.10× | 1.28× | yes |
+| LLaMA-style (RMSNorm + SwiGLU) | 37 → 22 | 40.5% | 8.1% | 100% | 40.5% | 1.07× | 1.10× | yes |
+| MoE Transformer (parallel experts) | 53 → 32 | 39.6% | 17.0% | 100% | 39.6% | 1.02× | 1.10× | yes |
+| Multi-head Transformer (parallel heads) | 75 → 24 | 68.0% | 4.0% | 100% | 68.0% | 1.06× | 1.14× | yes |
+| MLP classifier | 13 → 5 | 61.5% | 38.5% | N/A | 61.5% | 1.02× | 1.53× | yes |
 
 *GRR = graph reduction ratio, OMR = operator merge ratio, ACR = attention canonicalization rate. Measured speedups are NumPy interleaved timings (±1%); modeled speedups use the calibrated per-op model. Normalization removes nothing on the clean templates (only on the Post-LN ones, which contain planted redundancy) — see §2 for real graphs.*
 
@@ -73,38 +73,43 @@ Traced with `torch.fx.make_fx`; the GPT-2 configs are the real HuggingFace code 
 
 | | Median | Range |
 |---|---|---|
-| Real speedup, autotuned attention lowering | **1.04×** | 0.97× – 1.55× |
+| Real speedup, autotuned attention lowering | **1.02×** | 0.96× – 1.56× |
+| Real speedup, **generated Metal kernels** (fused add+norm, scale+softmax) | **1.04×** | 0.94× – 1.53× |
 | Real speedup, fixed fused-attention kernel | 0.99× | |
-| Modeled speedup, calibrated model | 1.20× | |
+| Modeled speedup, calibrated model | 1.19× | |
 | Modeled speedup, old hand-written table | 1.70× | |
 
 The original hand-written cost table over-predicted gains ~1.6×. The per-op model is now **fitted to measured kernel times** (`time = a + b·work` per op class). Fitted on Post-LN + LLaMA only and tested on the other **20 graphs** (4 architectures × 5 sizes):
 
 | Held-out architectures | Old table | Calibrated |
 |---|---|---|
-| Correlation with measured latency (log) | 0.17 | **0.995** |
-| Mean speedup error | 1.59 | **0.11** |
-| Speedup rank correlation | 0.12 | **0.75** |
-| Latency error (mean / median) | – | 9.8% / 6.3% |
+| Correlation with measured latency (log) | 0.30 | **0.997** |
+| Mean speedup error | 0.63 | **0.07** |
+| Speedup rank correlation | 0.32 | **0.71** |
+| Latency error (mean / median) | – | 6.7% / 5.7% |
 
 On a real GPU fusion mostly removes launch overhead; only attention and bias-folding reduce actual GPU work. The fixed fused-attention kernel is *slower* than separate matmul+softmax at mid sizes on MPS, which is why an "autotuned" lowering (time both once per shape) exists. The shipped op table is the calibrated one (`docs/results/cost_calibration.json`); `COST_MODEL=legacy` restores the old one.
 
+**Generated fused kernels (`utils/metal_codegen.py`).** For `FusedAddLayerNorm`, `FusedAddRMSNorm` and `FusedScaleSoftmax` the compiler *generates Metal source* specialised to the row length/epsilon, compiles it with `torch.mps.compile_shader` and runs it (verified to ≤2e-6 against PyTorch; 8–30% faster than PyTorch's composed ops in isolation). End to end the gain is small because these ops are a small share of a model's time. Only Apple GPUs; no CUDA code generation. The unfused RMSNorm baseline uses PyTorch's native one-kernel `rms_norm` (an earlier version composed it from four calls, which flattered fusion).
+
 ### 5. Learned optimizers (all evaluated on architecture families never seen in training)
 
-* **GNN plan selector** (`search/learned_optimizer.py`): 700 generated graphs × 32 plans (passes × 1–4 devices), reward = deployment speedup − 0.15·(devices−1) − 0.005·(#passes) under the calibrated model. Leave-one-family-out mean reward **1.37** vs fixed pipeline 1.23, random 1.15, best possible 1.43 (regret 3.3%, within 2% of best on 61% of graphs).
-* **RL pass policy** (`search/rl_policy.py`): DQN with a GNN Q-network over the *current* graph; actions = apply normalize / canonicalize / merge, place on 2–4 devices, stop; offline training on a tabulated exact simulator. Mean reward **1.38** (fixed 1.23, random 1.08, best 1.43; regret 3.5%). It essentially ties the supervised selector.
+* **GNN plan selector** (`search/learned_optimizer.py`): 700 generated graphs × 32 plans (passes × 1–4 devices), reward = deployment speedup − 0.15·(devices−1) − 0.005·(#passes) under the calibrated model. Leave-one-family-out mean reward **1.37** vs fixed pipeline 1.24, random 1.15, best possible 1.43 (regret 3.5%, within 2% of best on 61% of graphs).
+* **RL pass policy** (`search/rl_policy.py`): DQN with a GNN Q-network over the *current* graph; actions = apply normalize / canonicalize / merge, place on 2–4 devices, stop; offline training on a tabulated exact simulator. Mean reward **1.38** (fixed 1.24, random 1.08, best 1.43; regret 3.3%). It essentially ties the supervised selector.
 * **Neuro-symbolic search** (`search/neuro_symbolic.py`, `benchmarks/neuro_symbolic_study.py`): nine symbolic rewrite rules propose every legal rewrite; an additive latency GNN trained on **962 real-GPU timings** scores them (no GPU at search time). Held-out architectures, final graphs *measured* and checked for identical outputs (all match):
 
 | Held-out architecture | Latency error | Rank corr. | Fixed pipeline | Naive rewrite order | Neuro-symbolic |
 |---|---|---|---|---|---|
-| Post-LN Transformer | 6% | 0.94 | 1.056× | 1.007× | **1.054×** |
-| Pre-LN Transformer | 9% | 0.97 | 1.005× | 0.965× | **1.029×** |
-| Post-LN + ReLU | 9% | 0.94 | 1.047× | 1.012× | **1.044×** |
-| LLaMA-style | 14% | 0.92 | 1.018× | 0.979× | **1.046×** |
-| MoE Transformer | 10% | 0.96 | 1.024× | 0.992× | **1.047×** |
-| Multi-head Transformer | 58% | 0.72 | 1.099× | 0.989× | **0.969×** |
+| Post-LN Transformer | 5% | 0.91 | 1.066× | 1.006× | **1.066×** |
+| Pre-LN Transformer | 9% | 0.96 | 1.015× | 0.969× | **1.033×** |
+| Post-LN + ReLU | 8% | 0.94 | 1.052× | 1.021× | **1.057×** |
+| LLaMA-style | 14% | 0.90 | 1.037× | 0.990× | **1.049×** |
+| MoE Transformer | 10% | 0.95 | 1.024× | 0.978× | **1.011×** |
+| Multi-head Transformer | 48% | 0.81 | 1.101× | 0.993× | **0.990×** |
 
-Geomean speedup: fixed **1.041×**, naive **0.991×**, neuro-symbolic **1.031×** (better than fixed in 42% of cases, worse in 35%). It beats the fixed pipeline on several architectures but fails on multi-head attention (a structure unlike any training architecture), so overall it is **on par, not better**. Its value is that correctness is guaranteed by the symbolic rules and no GPU is needed at search time.
+Geomean speedup: fixed **1.049×**, naive **0.993×**, neuro-symbolic **1.034×** (better than fixed in 37% of cases, worse in 32%). It beats the fixed pipeline on several architectures but fails on multi-head attention (a structure unlike any training architecture), so overall it is **on par, not better**. Its value is that correctness is guaranteed by the symbolic rules and no GPU is needed at search time.
+
+**Architectures the importer cannot yet translate:** LLaMA, OPT, GPT-NeoX (Pythia), GPT-Neo — they need rotary embeddings, decomposed RMSNorm, `triu`/`cumsum` mask construction and similar ops (see `docs/results/real_graph_study.json`). Real-graph evidence therefore covers GPT-2-style models and our trained Transformer only.
 
 ### 6. Comparison with XLA and TorchInductor on the same graphs (CPU, `benchmarks/compiler_comparison.py`)
 
@@ -115,17 +120,32 @@ The same IR graph (same weights/input) run by each system; 18 architecture×size
 | ours | 1.00× |
 | xla | 0.70× |
 | ours+xla | 0.70× |
-| inductor | 0.86× |
-| ours+inductor | 0.88× |
+| inductor | 0.84× |
+| ours+inductor | 0.87× |
 
-Effect of our passes **on top of** each compiler: XLA ×1.001, TorchInductor ×1.025. On small CPU workloads the established compilers are *slower* than eager (compile/launch overheads) and our graph-level rewrites add essentially nothing on top of them. Our contribution is therefore the explainable, verifiable pass pipeline and the learned decision-making — not raw speed.
+Effect of our passes **on top of** each compiler: XLA ×1.000, TorchInductor ×1.032. On small CPU workloads the established compilers are *slower* than eager (compile/launch overheads) and our graph-level rewrites add essentially nothing on top of them. Our contribution is therefore the explainable, verifiable pass pipeline and the learned decision-making — not raw speed.
+
+### 7. A never-tuned architecture and sensitivity to my assumptions
+
+* **Unseen architecture** (`benchmarks/unseen_architecture_test.py`): the GPT-J/PaLM-style *parallel block* (attention ‖ FFN) appears in no training set and was never used to choose features or thresholds; models are frozen. Modeled reward on 60 fresh graphs: fixed 1.12, plan selector 1.32 (8.2% regret), **RL 1.39 (3.1% regret)**, best 1.43. Real GPU geomean speedup over 5 sizes: fixed pipeline 0.986×, neuro-symbolic 1.030×, fixed + generated kernels 1.038× (outputs identical).
+* **Sensitivity** (`benchmarks/learned_sensitivity.py`): the plan selector's advantage over the fixed pipeline holds across the assumed constants, but how often multi-device placement wins depends strongly on them:
+
+| Setting | Transfer µs | Device penalty | Fixed | Learned | Best | Regret | Best plan uses >1 device |
+|---|---|---|---|---|---|---|---|
+| baseline | 50 | 0.15 | 1.24 | **1.37** | 1.43 | 3.5% | 32% |
+| cheap transfer | 10 | 0.15 | 1.24 | **1.42** | 1.48 | 3.1% | 46% |
+| expensive transfer | 150 | 0.15 | 1.24 | **1.32** | 1.35 | 2.0% | 25% |
+| cheap devices | 50 | 0.05 | 1.24 | **1.48** | 1.51 | 1.8% | 56% |
+| expensive devices | 50 | 0.3 | 1.24 | **1.28** | 1.35 | 4.3% | 25% |
 
 ## Honest limitations
 
 * **No NVIDIA GPU measured.** Real-GPU numbers are one Apple M3 Pro (Metal/MPS); `benchmarks/colab_gpu_benchmark.ipynb` is untested.
-* **Real speedups are small** (median 1.04× on GPU, ~1.00× on CPU). The compiler emits no fused kernels of its own; fused IR nodes are lowered to PyTorch calls, and only attention (fused kernel) and linear+bias (one GEMM) reduce real GPU work.
+* **Real speedups are small** (median 1.02× on GPU, 1.04× with generated kernels, ~1.00× on CPU). Only three fused ops get generated Metal code; the rest are lowered to PyTorch calls, and only attention (PyTorch's fused kernel) and linear+bias (one GEMM) otherwise reduce real GPU work. No CUDA code generation.
 * **Hand-built templates have synthetic weights**; "accuracy preserved" means output equivalence. Only the Tiny Shakespeare LM is trained, and it has one attention head.
-* **Learned-optimizer rewards are modeled** (calibrated per-op times; assumed 50 µs cross-device transfer and device penalty 0.15). No multi-device run was ever executed. Held-out evaluation never trains on the test family, but features were chosen after seeing held-out results, so figures are slightly optimistic.
+* **Learned-optimizer rewards are modeled** (calibrated per-op times; *assumed* 50 µs cross-device transfer and device penalty 0.15 — §7 shows how results move with them). No multi-device run was ever executed. Leave-one-family-out figures are slightly optimistic because features were chosen after seeing them; the frozen unseen-architecture test in §7 is the clean check.
+* **The importer handles GPT-2-style graphs only** (see §2); LLaMA/OPT/NeoX fail on unsupported ops.
+* Untestable here: the Colab/NVIDIA notebook and `run-server.bat` (Windows).
 * The per-op table is shape-independent (calibrated at B8·S256·D256); the shape-aware fit in `utils/gpu_calibration.py` is more accurate but only used for validation.
 * Older prototypes (`search/gnn*.py`, `training/train_optimizer.py`) are superseded and kept for history.
 
@@ -141,5 +161,7 @@ python -m search.learned_optimizer train     # §5
 python -m search.rl_policy train             # §5
 python benchmarks/neuro_symbolic_study.py    # §5   (needs a GPU for timings)
 python benchmarks/compiler_comparison.py     # §6
+python benchmarks/unseen_architecture_test.py && python benchmarks/learned_sensitivity.py
 python tools/make_diagrams.py && python tools/make_readme.py
+# or everything, one job at a time:  tools/rerun_all.sh
 ```

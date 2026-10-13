@@ -27,10 +27,10 @@
    "ir_vs_pytorch_max_diff": 1.5735626220703125e-05,
    "compiled_vs_pytorch_max_diff": 1.5735626220703125e-05,
    "same_top1_pct": 100.0,
-   "latency_ms_original": 0.43608400005723524,
-   "latency_ms_optimized": 0.3773749999709253,
-   "speedup_cpu": 1.1555720439637844,
-   "compile_ms": 1.6288330000406859,
+   "latency_ms_original": 0.4260840000824828,
+   "latency_ms_optimized": 0.3745410001556593,
+   "speedup_cpu": 1.1376164422730817,
+   "compile_ms": 1.8694999998842832,
    "op_histogram_before": {
     "Input": 1,
     "Gather": 1,
@@ -93,10 +93,10 @@
    "ir_vs_pytorch_max_diff": 2.384185791015625e-07,
    "compiled_vs_pytorch_max_diff": 2.384185791015625e-07,
    "same_top1_pct": 100.0,
-   "latency_ms_original": 0.51204199996846,
-   "latency_ms_optimized": 0.44949999994514656,
-   "speedup_cpu": 1.139136818756275,
-   "compile_ms": 1.9096669999498772,
+   "latency_ms_original": 0.5100420000871964,
+   "latency_ms_optimized": 0.45637500011252996,
+   "speedup_cpu": 1.117594083728148,
+   "compile_ms": 2.017459000171584,
    "op_histogram_before": {
     "Input": 1,
     "Reshape": 41,
@@ -162,10 +162,10 @@
    "ir_vs_pytorch_max_diff": 5.811452865600586e-07,
    "compiled_vs_pytorch_max_diff": 5.811452865600586e-07,
    "same_top1_pct": 100.0,
-   "latency_ms_original": 1.3291249999838328,
-   "latency_ms_optimized": 1.2233749999950305,
-   "speedup_cpu": 1.086441197498095,
-   "compile_ms": 3.7077499999895736,
+   "latency_ms_original": 1.3559170001826715,
+   "latency_ms_optimized": 1.2287919998925645,
+   "speedup_cpu": 1.1034552636257575,
+   "compile_ms": 4.046999999900436,
    "op_histogram_before": {
     "Input": 1,
     "Reshape": 77,
@@ -231,10 +231,10 @@
    "ir_vs_pytorch_max_diff": 1.3113021850585938e-06,
    "compiled_vs_pytorch_max_diff": 1.3113021850585938e-06,
    "same_top1_pct": 100.0,
-   "latency_ms_original": 2.5526250000211803,
-   "latency_ms_optimized": 2.426750000040556,
-   "speedup_cpu": 1.0518697846826086,
-   "compile_ms": 6.1749999999847205,
+   "latency_ms_original": 2.7191249998850253,
+   "latency_ms_optimized": 2.4334580000413553,
+   "speedup_cpu": 1.1173913828957867,
+   "compile_ms": 7.108166999842069,
    "op_histogram_before": {
     "Input": 1,
     "Reshape": 113,
@@ -274,5 +274,31 @@
    }
   }
  ],
- "torch": "2.14.1"
+ "torch": "2.14.1",
+ "other_architectures": [
+  {
+   "model": "LLaMA",
+   "imported": false,
+   "reason": "(first failure at fx node 'triu (triu)')",
+   "unsupported_ops": "_softmax, _unsafe_view, add, alias, bmm, cat, clone, cos, div, expand, gt, mean, mm, mul, mul_, neg, pow, rsqrt, silu, sin, slice, transpose, triu, unsqueeze, view"
+  },
+  {
+   "model": "OPT",
+   "imported": false,
+   "reason": "(first failure at fx node 'lt (lt)')",
+   "unsupported_ops": "_softmax, _to_copy, _unsafe_view, add, addmm, alias, bmm, clone, cumsum, embedding, lift_fresh_copy, lt, masked_fill, maximum, mm, mul, native_layer_norm, relu, rsub, sub, transpose, view"
+  },
+  {
+   "model": "GPT-NeoX (Pythia)",
+   "imported": false,
+   "reason": "(first failure at fx node 'triu (triu)')",
+   "unsupported_ops": "_softmax, _unsafe_view, add, addmm, baddbmm, bmm, cat, clone, cos, expand, gelu, gt, lift_fresh_copy, mm, mul, mul_, native_layer_norm, neg, permute, sin, slice, transpose, triu, unsqueeze, view, wher"
+  },
+  {
+   "model": "GPT-Neo",
+   "imported": false,
+   "reason": "(first failure at fx node 'triu (triu)')",
+   "unsupported_ops": "_softmax, _unsafe_view, add, addmm, bmm, clone, expand, gt, lift_fresh_copy, mm, mul, mul_, native_layer_norm, permute, pow, slice, tanh, transpose, triu, unsqueeze, view, where"
+  }
+ ]
 }

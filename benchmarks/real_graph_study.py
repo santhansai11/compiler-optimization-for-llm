@@ -95,6 +95,39 @@ def study(model, label, vocab, batch=2, seq=32):
     }
 
 
+def unsupported_architectures():
+    """Real HF architectures the importer cannot translate yet (honest list)."""
+    import transformers as T
+
+    makers = {
+        "LLaMA": lambda: T.LlamaForCausalLM._from_config(T.LlamaConfig(
+            hidden_size=64, intermediate_size=176, num_hidden_layers=2, num_attention_heads=4,
+            num_key_value_heads=4, vocab_size=500, max_position_embeddings=64), attn_implementation="eager"),
+        "OPT": lambda: T.OPTForCausalLM._from_config(T.OPTConfig(
+            hidden_size=64, ffn_dim=256, num_hidden_layers=2, num_attention_heads=4, vocab_size=500,
+            max_position_embeddings=64, word_embed_proj_dim=64), attn_implementation="eager"),
+        "GPT-NeoX (Pythia)": lambda: T.GPTNeoXForCausalLM._from_config(T.GPTNeoXConfig(
+            hidden_size=64, intermediate_size=256, num_hidden_layers=2, num_attention_heads=4,
+            vocab_size=500, max_position_embeddings=64), attn_implementation="eager"),
+        "GPT-Neo": lambda: T.GPTNeoForCausalLM._from_config(T.GPTNeoConfig(
+            hidden_size=64, num_layers=2, num_heads=4, vocab_size=500, max_position_embeddings=64,
+            attention_types=[[["global"], 2]]), attn_implementation="eager"),
+    }
+    out = []
+    for name, make in makers.items():
+        try:
+            torch.manual_seed(0)
+            ids = torch.randint(0, 500, (2, 32))
+            import_module(make().eval(), ids, name.split()[0], name, name)
+            out.append({"model": name, "imported": True})
+        except Exception as exc:
+            msg = str(exc)
+            out.append({"model": name, "imported": False,
+                        "reason": msg[msg.find("(first failure"):][:140] or msg[:140],
+                        "unsupported_ops": msg.split(": ", 1)[-1].split(" (first")[0][:200]})
+    return out
+
+
 def main():
     rows = []
     specs = [lambda: tiny_lm(32), lambda: gpt2(2, 64, 2), lambda: gpt2(4, 128, 4),
@@ -115,7 +148,12 @@ def main():
             rows.append({"model": label, "error": f"{type(exc).__name__}: {exc}"})
     out = ROOT / "docs" / "results" / "real_graph_study.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"rows": rows, "torch": torch.__version__}, indent=1, default=float))
+    try:
+        unsupported = unsupported_architectures()
+    except Exception as exc:  # transformers missing
+        unsupported = [{"error": str(exc)}]
+    out.write_text(json.dumps({"rows": rows, "torch": torch.__version__,
+                               "other_architectures": unsupported}, indent=1, default=float))
     print("wrote", out)
 
 

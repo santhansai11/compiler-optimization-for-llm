@@ -308,6 +308,55 @@ def create_multihead_graph(num_blocks=2, batch=4, seq=32, d_model=64, heads=4):
     return graph
 
 
+def create_parallel_block_graph(num_blocks=2, batch=4, seq=32, d_model=64):
+    """GPT-J / PaLM-style block: attention and FFN run IN PARALLEL on the same
+    LayerNorm output and are summed with the residual (3-input Add).
+
+    Deliberately NOT part of ``ARCHITECTURES``: it is the held-out "never
+    tuned on" architecture used by ``benchmarks/unseen_architecture_test.py``.
+    """
+    graph = ComputationGraph(f"parallel_block_{num_blocks}b")
+    graph.meta["config"] = {"batch": batch, "seq": seq, "d_model": d_model}
+    scale_factor = float(1.0 / np.sqrt(d_model))
+    graph.add_operation("Input", "Input")
+    node = "Input"
+    for i in range(1, num_blocks + 1):
+        p = f"Block{i}"
+        graph.add_operation(f"{p}_LN", "LayerNorm")
+        graph.add_dependency(node, f"{p}_LN")
+        for role in ("Q", "K", "V"):
+            graph.add_operation(f"{p}_{role}", "MatMul")
+            graph.add_dependency(f"{p}_LN", f"{p}_{role}")
+        graph.add_operation(f"{p}_QK", "MatMul", transpose_rhs=True)
+        graph.add_dependency(f"{p}_Q", f"{p}_QK")
+        graph.add_dependency(f"{p}_K", f"{p}_QK")
+        graph.add_operation(f"{p}_Scale", "Scale", factor=scale_factor)
+        graph.add_dependency(f"{p}_QK", f"{p}_Scale")
+        graph.add_operation(f"{p}_Softmax", "Softmax")
+        graph.add_dependency(f"{p}_Scale", f"{p}_Softmax")
+        graph.add_operation(f"{p}_AV", "MatMul")
+        graph.add_dependency(f"{p}_Softmax", f"{p}_AV")
+        graph.add_dependency(f"{p}_V", f"{p}_AV")
+        graph.add_operation(f"{p}_FFN1", "MatMul")
+        graph.add_dependency(f"{p}_LN", f"{p}_FFN1")
+        graph.add_operation(f"{p}_GELU", "GELU")
+        graph.add_dependency(f"{p}_FFN1", f"{p}_GELU")
+        graph.add_operation(f"{p}_FFN2", "MatMul")
+        graph.add_dependency(f"{p}_GELU", f"{p}_FFN2")
+        graph.add_operation(f"{p}_Sum", "Add")
+        graph.add_dependency(f"{p}_AV", f"{p}_Sum")
+        graph.add_dependency(f"{p}_FFN2", f"{p}_Sum")
+        graph.add_dependency(node, f"{p}_Sum")
+        node = f"{p}_Sum"
+    graph.add_operation("Final_LN", "LayerNorm")
+    graph.add_dependency(node, "Final_LN")
+    graph.add_operation("Logits", "MatMul", is_output=True)
+    graph.add_dependency("Final_LN", "Logits")
+    return graph
+
+
+UNSEEN_ARCHITECTURES = {"Parallel-block (GPT-J style)": create_parallel_block_graph}
+
 ARCHITECTURES = {
     "Post-LN Transformer": create_postln_transformer_graph,
     "Pre-LN Transformer (GPT-style)": create_preln_transformer_graph,

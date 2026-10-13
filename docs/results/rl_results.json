@@ -22,88 +22,88 @@
   "postln": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.267078727609372,
-   "random_policy": 0.9240673757339469,
-   "rl": 1.2615091916227255,
-   "oracle": 1.274489343374257,
-   "regret_pct": 1.0312674730988716,
-   "within_2pct_of_oracle": 81.0,
-   "td_loss": 0.0005251132474222687
+   "fixed_pipeline_1dev": 1.2655347852374637,
+   "random_policy": 0.9217895747515147,
+   "rl": 1.258813602954915,
+   "oracle": 1.2730101453780478,
+   "regret_pct": 1.1274496564824803,
+   "within_2pct_of_oracle": 77.0,
+   "td_loss": 0.0005315999907179503
   },
   "preln": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.2387680075645822,
-   "random_policy": 0.9514930554291234,
-   "rl": 1.218470268197613,
-   "oracle": 1.2495068713645638,
-   "regret_pct": 2.506186316097733,
-   "within_2pct_of_oracle": 66.0,
-   "td_loss": 0.0005624448009621119
+   "fixed_pipeline_1dev": 1.2430047854389408,
+   "random_policy": 0.9494391412607923,
+   "rl": 1.2067925686307646,
+   "oracle": 1.2537731112503645,
+   "regret_pct": 3.7736254685014523,
+   "within_2pct_of_oracle": 51.0,
+   "td_loss": 0.0005638958959752927
   },
   "relu": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.267508541808809,
-   "random_policy": 0.9411650816715326,
-   "rl": 1.2654952996448576,
-   "oracle": 1.27812522077087,
-   "regret_pct": 1.0001285320540991,
-   "within_2pct_of_oracle": 82.0,
-   "td_loss": 0.0005372527203144272
+   "fixed_pipeline_1dev": 1.2678214752116086,
+   "random_policy": 0.9403008298066043,
+   "rl": 1.2708804709237842,
+   "oracle": 1.27899713102223,
+   "regret_pct": 0.6340831753827749,
+   "within_2pct_of_oracle": 93.0,
+   "td_loss": 0.0005537337267014664
   },
   "llama": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.098029643281333,
-   "random_policy": 0.9276154301449536,
-   "rl": 1.0209378008713288,
-   "oracle": 1.105884772587039,
-   "regret_pct": 7.720592441411195,
-   "within_2pct_of_oracle": 6.0,
-   "td_loss": 0.0005289413109130692
+   "fixed_pipeline_1dev": 1.094329961008316,
+   "random_policy": 0.9245803907810368,
+   "rl": 1.0202132645219395,
+   "oracle": 1.1021452140244827,
+   "regret_pct": 7.480809553179156,
+   "within_2pct_of_oracle": 11.0,
+   "td_loss": 0.0005302797053445829
   },
   "moe": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.0988560354764254,
-   "random_policy": 1.2470554055494454,
-   "rl": 1.3721945039279828,
-   "oracle": 1.4239131187187164,
-   "regret_pct": 3.814100918123993,
-   "within_2pct_of_oracle": 38.0,
-   "td_loss": 0.0004920897277042968
+   "fixed_pipeline_1dev": 1.10248106223456,
+   "random_policy": 1.2430636568825255,
+   "rl": 1.3668901510251983,
+   "oracle": 1.4214886323724278,
+   "regret_pct": 4.03956978579548,
+   "within_2pct_of_oracle": 34.0,
+   "td_loss": 0.00046117979400150944
   },
   "multihead": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.145041946284835,
-   "random_policy": 1.575962547865555,
-   "rl": 2.0331965930662843,
-   "oracle": 2.14497215185626,
-   "regret_pct": 5.553937364668057,
-   "within_2pct_of_oracle": 39.0,
-   "td_loss": 0.00020694450417067854
+   "fixed_pipeline_1dev": 1.1340652464960035,
+   "random_policy": 1.5640023039771125,
+   "rl": 2.029665477377628,
+   "oracle": 2.1173354695208104,
+   "regret_pct": 4.464990452056211,
+   "within_2pct_of_oracle": 52.0,
+   "td_loss": 0.00022048309867386706
   },
   "mlp": {
    "graphs": 100,
    "no_passes": 1.0,
-   "fixed_pipeline_1dev": 1.5068518211770643,
-   "random_policy": 0.9892161726254918,
-   "rl": 1.4738518211770641,
-   "oracle": 1.5122018211770645,
-   "regret_pct": 2.6481476900199223,
-   "within_2pct_of_oracle": 78.0,
-   "td_loss": 0.0005529937200481072
+   "fixed_pipeline_1dev": 1.5553857070599735,
+   "random_policy": 0.9972123860679447,
+   "rl": 1.5395377267577064,
+   "oracle": 1.5607357070599734,
+   "regret_pct": 1.414175605577287,
+   "within_2pct_of_oracle": 90.0,
+   "td_loss": 0.0005357770206319401
   }
  },
  "lofo_mean": {
   "no_passes": 1.0,
-  "fixed_pipeline_1dev": 1.2317335318860603,
-  "random_policy": 1.0795107241457214,
-  "rl": 1.3779507826439794,
-  "oracle": 1.4270133285498245,
-  "regret_pct": 3.4677658193534104,
-  "within_2pct_of_oracle": 55.714285714285715
+  "fixed_pipeline_1dev": 1.2375175746695521,
+  "random_policy": 1.0771983262182188,
+  "rl": 1.3846847517417051,
+  "oracle": 1.4296407729469054,
+  "regret_pct": 3.276386242424978,
+  "within_2pct_of_oracle": 58.285714285714285
  }
 }

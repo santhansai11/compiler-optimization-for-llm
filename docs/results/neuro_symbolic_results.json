@@ -7,85 +7,85 @@
   "Post-LN Transformer": {
    "latency_model": {
     "graphs": 170,
-    "mape_pct": 6.291417897341732,
-    "spearman": 0.9360849042201745,
-    "train_loss": 0.010029340162873268
+    "mape_pct": 4.8737895129148345,
+    "spearman": 0.914976093209006,
+    "train_loss": 0.008544442243874073
    },
-   "geomean_speedup_fixed": 1.055782849534712,
-   "geomean_speedup_naive": 1.0073843390137167,
-   "geomean_speedup_neurosymbolic": 1.0535919779117722,
+   "geomean_speedup_fixed": 1.0660203495777045,
+   "geomean_speedup_naive": 1.0055882614855136,
+   "geomean_speedup_neurosymbolic": 1.0656034001486034,
    "all_outputs_match": true
   },
   "Pre-LN Transformer": {
    "latency_model": {
     "graphs": 167,
-    "mape_pct": 9.265367244576307,
-    "spearman": 0.9692405206798108,
-    "train_loss": 0.00834549032151699
+    "mape_pct": 9.42508040334928,
+    "spearman": 0.9644171210075546,
+    "train_loss": 0.008989137597382069
    },
-   "geomean_speedup_fixed": 1.0048134002257347,
-   "geomean_speedup_naive": 0.9646713145550981,
-   "geomean_speedup_neurosymbolic": 1.0292368826629346,
+   "geomean_speedup_fixed": 1.014986572465079,
+   "geomean_speedup_naive": 0.9694269829256825,
+   "geomean_speedup_neurosymbolic": 1.0325369028660423,
    "all_outputs_match": true
   },
   "Post-LN + ReLU": {
    "latency_model": {
     "graphs": 147,
-    "mape_pct": 8.76027816038386,
-    "spearman": 0.9434638720353007,
-    "train_loss": 0.008132606744766235
+    "mape_pct": 7.854356800645913,
+    "spearman": 0.938480834762635,
+    "train_loss": 0.009992695413529873
    },
-   "geomean_speedup_fixed": 1.046905178700241,
-   "geomean_speedup_naive": 1.0121795760817696,
-   "geomean_speedup_neurosymbolic": 1.043672350617034,
+   "geomean_speedup_fixed": 1.0520886307748702,
+   "geomean_speedup_naive": 1.021007909447934,
+   "geomean_speedup_neurosymbolic": 1.0568982686167292,
    "all_outputs_match": true
   },
   "LLaMA-style": {
    "latency_model": {
     "graphs": 138,
-    "mape_pct": 13.637814857043146,
-    "spearman": 0.9232857446191569,
-    "train_loss": 0.009877472184598446
+    "mape_pct": 14.265685785359356,
+    "spearman": 0.9014632787581424,
+    "train_loss": 0.008867858909070492
    },
-   "geomean_speedup_fixed": 1.0177651507841394,
-   "geomean_speedup_naive": 0.9786840163585194,
-   "geomean_speedup_neurosymbolic": 1.0463855905243888,
+   "geomean_speedup_fixed": 1.0374432617623017,
+   "geomean_speedup_naive": 0.9904533500991842,
+   "geomean_speedup_neurosymbolic": 1.0494545019992614,
    "all_outputs_match": true
   },
   "MoE Transformer": {
    "latency_model": {
     "graphs": 169,
-    "mape_pct": 9.593227832842071,
-    "spearman": 0.9588210432101836,
-    "train_loss": 0.009162113070487976
+    "mape_pct": 10.373399331565793,
+    "spearman": 0.9503903336482523,
+    "train_loss": 0.008710072375833988
    },
-   "geomean_speedup_fixed": 1.0238773324245085,
-   "geomean_speedup_naive": 0.9923894295304302,
-   "geomean_speedup_neurosymbolic": 1.0469704342771546,
+   "geomean_speedup_fixed": 1.0235170202727037,
+   "geomean_speedup_naive": 0.9780969165961432,
+   "geomean_speedup_neurosymbolic": 1.0114814533321927,
    "all_outputs_match": true
   },
   "Multi-head Transformer": {
    "latency_model": {
     "graphs": 171,
-    "mape_pct": 57.54423967996345,
-    "spearman": 0.7220006239950081,
-    "train_loss": 0.007096829358488321
+    "mape_pct": 47.52409772767585,
+    "spearman": 0.8124319005447957,
+    "train_loss": 0.006125628482550383
    },
-   "geomean_speedup_fixed": 1.0985551173155907,
-   "geomean_speedup_naive": 0.9889148215684158,
-   "geomean_speedup_neurosymbolic": 0.9690907766266617,
+   "geomean_speedup_fixed": 1.10145637051401,
+   "geomean_speedup_naive": 0.9929788148669867,
+   "geomean_speedup_neurosymbolic": 0.9897341461445248,
    "all_outputs_match": true
   }
  },
  "summary": {
-  "speedup_fixed": 1.0408323631725493,
-  "speedup_naive": 0.9905717542727742,
-  "speedup_neurosymbolic": 1.0310754199590604,
-  "ns_beats_fixed_cases_pct": 41.66666666666667,
-  "ns_worse_than_fixed_cases_pct": 35.0,
+  "speedup_fixed": 1.0488598803630793,
+  "speedup_naive": 0.9927808328917084,
+  "speedup_neurosymbolic": 1.0339409665260766,
+  "ns_beats_fixed_cases_pct": 36.666666666666664,
+  "ns_worse_than_fixed_cases_pct": 31.666666666666664,
   "all_outputs_match": true,
-  "mean_latency_mape_pct": 17.51539094535843,
-  "mean_latency_spearman": 0.9088161181266058
+  "mean_latency_mape_pct": 15.71940159358517,
+  "mean_latency_spearman": 0.913693260321731
  },
  "cases": [
   {
@@ -103,26 +103,26 @@
     17
    ],
    "latency_us": [
-    697.7920002100291,
-    576.6250001215667,
-    668.2500002170855,
-    569.1250003110326
+    662.3339997986477,
+    562.0409999664844,
+    677.3749998956191,
+    563.4999999983847
    ],
-   "speedup_fixed": 1.2101313679825145,
-   "speedup_naive": 1.044208005960863,
-   "speedup_neurosymbolic": 1.2260786291740455,
+   "speedup_fixed": 1.1784442769088803,
+   "speedup_naive": 0.9777951650130442,
+   "speedup_neurosymbolic": 1.1753930786167637,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
     "remove-dead",
     "fuse-pair",
-    "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
-    "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -146,26 +146,26 @@
     17
    ],
    "latency_us": [
-    666.8750002063462,
-    601.8750000293949,
-    707.5420003275212,
-    602.7089998497104
+    659.7080000574351,
+    566.7919999723381,
+    671.3330001275608,
+    562.7079999612761
    ],
-   "speedup_fixed": 1.107995846602329,
-   "speedup_naive": 0.9425235532274404,
-   "speedup_neurosymbolic": 1.1064626550667669,
+   "speedup_fixed": 1.1639331537665172,
+   "speedup_naive": 0.9826837053028574,
+   "speedup_neurosymbolic": 1.1723807020743162,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
     "remove-dead",
     "fuse-pair",
-    "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
-    "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -189,14 +189,14 @@
     17
    ],
    "latency_us": [
-    596.7499996586412,
-    506.9170001661405,
-    626.6659997891111,
-    489.45900016406085
+    613.0829999619891,
+    493.29200010106433,
+    631.208999948285,
+    496.9169999640144
    ],
-   "speedup_fixed": 1.177214414712977,
-   "speedup_naive": 0.9522616511179203,
-   "speedup_neurosymbolic": 1.2192032416578664,
+   "speedup_fixed": 1.2428399403119903,
+   "speedup_naive": 0.9712836794345755,
+   "speedup_neurosymbolic": 1.2337734470875161,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -204,11 +204,11 @@
     "remove-dead",
     "fuse-pair",
     "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
-    "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -232,28 +232,28 @@
     18
    ],
    "latency_us": [
-    628.2499998633284,
-    519.6249999244174,
-    669.8329998471308,
-    530.124999841064
+    627.500000064174,
+    500.9579999750713,
+    641.3329999759299,
+    498.4170000170707
    ],
-   "speedup_fixed": 1.2090449842765671,
-   "speedup_naive": 0.9379203473204627,
-   "speedup_neurosymbolic": 1.1850978543771433,
+   "speedup_fixed": 1.2526000185552475,
+   "speedup_naive": 0.9784308621070877,
+   "speedup_neurosymbolic": 1.2589859496018037,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "remove-dead",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "eliminate-identity",
-    "fuse-pair",
     "eliminate-identity",
     "fuse-attention",
     "fuse-pair",
-    "merge-scales",
+    "fuse-pair",
     "eliminate-identity",
+    "merge-scales",
+    "fuse-pair",
+    "fuse-pair",
+    "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -274,29 +274,30 @@
     42,
     14,
     24,
-    18
+    17
    ],
    "latency_us": [
-    1924.9580000177957,
-    2403.290999609453,
-    1851.542000167683,
-    2450.9589998160664
+    1908.3750000845612,
+    2389.8750000626023,
+    1877.3750000491418,
+    2407.292000043526
    ],
-   "speedup_fixed": 0.8009675067774195,
-   "speedup_naive": 1.0396512743666975,
-   "speedup_neurosymbolic": 0.7853897189476672,
+   "speedup_fixed": 0.7985250274740611,
+   "speedup_naive": 1.016512417622802,
+   "speedup_neurosymbolic": 0.7927476185066273,
    "outputs_match": true,
    "rewrites_applied": [
     "remove-dead",
     "fuse-attention",
     "fuse-attention",
     "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
     "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair"
@@ -316,30 +317,31 @@
     43,
     14,
     24,
-    18
+    17
    ],
    "latency_us": [
-    1964.8340003186604,
-    2391.749999787862,
-    1853.7500000093132,
-    2420.6670000239683
+    1919.5419999959995,
+    2390.1249999198626,
+    1857.7499999992142,
+    2418.8330000924907
    ],
-   "speedup_fixed": 0.8215047561379462,
-   "speedup_naive": 1.0599239381301626,
-   "speedup_neurosymbolic": 0.8116911579738996,
+   "speedup_fixed": 0.803113644709109,
+   "speedup_naive": 1.033261741352072,
+   "speedup_neurosymbolic": 0.7935818636187784,
    "outputs_match": true,
    "rewrites_applied": [
     "remove-dead",
     "fuse-attention",
+    "fuse-pair",
     "fuse-attention",
     "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
     "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair"
@@ -362,14 +364,14 @@
     17
    ],
    "latency_us": [
-    2523.416999792971,
-    2225.084000201605,
-    2524.9579998671834,
-    2241.9580000132555
+    2515.207999977065,
+    2215.0839999994787,
+    2499.6669999381993,
+    2228.0829998635454
    ],
-   "speedup_fixed": 1.1340771852048444,
-   "speedup_naive": 0.9993896927892293,
-   "speedup_neurosymbolic": 1.1255416023752682,
+   "speedup_fixed": 1.1354910242580674,
+   "speedup_naive": 1.0062172281504895,
+   "speedup_neurosymbolic": 1.1288663843003621,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -380,8 +382,8 @@
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
@@ -405,14 +407,14 @@
     17
    ],
    "latency_us": [
-    2542.9580000491114,
-    2254.5409997292154,
-    2480.3749997772684,
-    2244.1670002990577
+    2570.792000142319,
+    2249.0840001410106,
+    2519.542000072761,
+    2226.9580001648137
    ],
-   "speedup_fixed": 1.127927148077829,
-   "speedup_naive": 1.0252312655455174,
-   "speedup_neurosymbolic": 1.1331411609342072,
+   "speedup_fixed": 1.1430395663217285,
+   "speedup_naive": 1.0203409985100778,
+   "speedup_neurosymbolic": 1.1543962660957499,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -423,8 +425,8 @@
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
@@ -448,28 +450,28 @@
     14
    ],
    "latency_us": [
-    9193.875000164553,
-    9167.125000203669,
-    8995.292000236077,
-    9204.957999827457
+    9218.207999992956,
+    9230.124999930922,
+    9083.91699999811,
+    9151.707999990322
    ],
-   "speedup_fixed": 1.0029180359120542,
-   "speedup_naive": 1.0220763261407484,
-   "speedup_neurosymbolic": 0.9987959749883583,
+   "speedup_fixed": 0.9987089015654658,
+   "speedup_naive": 1.0147833803407575,
+   "speedup_neurosymbolic": 1.007266403167879,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
     "remove-dead",
     "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
+    "fuse-pair",
     "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -492,32 +494,34 @@
     47,
     20,
     25,
-    25
+    23
    ],
    "latency_us": [
-    9661.749999850144,
-    9044.666000136203,
-    9105.58299983677,
-    9124.624999913067
+    9621.125000194297,
+    9011.249999957727,
+    9092.750000036176,
+    9008.375000121305
    ],
-   "speedup_fixed": 1.068226289362664,
-   "speedup_naive": 1.061079779298409,
-   "speedup_neurosymbolic": 1.0588654328196714,
+   "speedup_fixed": 1.0676792898032383,
+   "speedup_naive": 1.0581094828468856,
+   "speedup_neurosymbolic": 1.0680200369172843,
    "outputs_match": true,
    "rewrites_applied": [
-    "eliminate-identity",
-    "fuse-attention",
     "remove-dead",
     "eliminate-identity",
-    "eliminate-identity",
-    "eliminate-identity",
-    "fuse-pair",
+    "fuse-attention",
     "eliminate-identity",
     "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "eliminate-identity",
     "merge-scales",
     "fuse-pair",
     "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair"
@@ -540,14 +544,14 @@
     18
    ],
    "latency_us": [
-    672.5000002916204,
-    607.4589996387658,
-    732.9589998334995,
-    597.62499995486
+    633.2499999643915,
+    553.7500001082662,
+    685.4589998965821,
+    560.7919999874866
    ],
-   "speedup_fixed": 1.1070706017879925,
-   "speedup_naive": 0.91751380424333,
-   "speedup_neurosymbolic": 1.1252875973100454,
+   "speedup_fixed": 1.1435665911342334,
+   "speedup_naive": 0.9238335189412239,
+   "speedup_neurosymbolic": 1.1292065506970885,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -577,14 +581,14 @@
     20
    ],
    "latency_us": [
-    695.0839997443836,
-    594.0419996477431,
-    708.9579999046691,
-    604.1660003575089
+    641.0829998912959,
+    561.2919999293808,
+    678.5000000490982,
+    553.2079999284178
    ],
-   "speedup_fixed": 1.1700923506360774,
-   "speedup_naive": 0.9804304342963178,
-   "speedup_neurosymbolic": 1.1504851304659232,
+   "speedup_fixed": 1.142155954426491,
+   "speedup_naive": 0.9448533527559401,
+   "speedup_neurosymbolic": 1.1588462205431747,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -615,14 +619,14 @@
     18
    ],
    "latency_us": [
-    657.5410002369608,
-    526.8750001050648,
-    671.6249999954016,
-    530.6250000103319
+    600.1669999022852,
+    476.95800003566546,
+    624.5419999686419,
+    487.95900011100457
    ],
-   "speedup_fixed": 1.2480018981842746,
-   "speedup_naive": 0.9790299649975251,
-   "speedup_neurosymbolic": 1.2391820970066578,
+   "speedup_fixed": 1.2583225354379348,
+   "speedup_naive": 0.9609713997335958,
+   "speedup_neurosymbolic": 1.229953745633864,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -652,14 +656,14 @@
     24
    ],
    "latency_us": [
-    648.1670002358442,
-    608.542000009038,
-    660.0000001526496,
-    591.9999998695857
+    630.0000000010186,
+    577.3329999101406,
+    643.1249998968269,
+    569.7499998404965
    ],
-   "speedup_fixed": 1.0651146514558036,
-   "speedup_naive": 0.9820712122514113,
-   "speedup_neurosymbolic": 1.0948766898287698,
+   "speedup_fixed": 1.0912246486846853,
+   "speedup_naive": 0.9795918368934284,
+   "speedup_neurosymbolic": 1.1057481354583403,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -668,8 +672,8 @@
     "fuse-pair",
     "fuse-pair",
     "eliminate-identity",
-    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair"
@@ -692,14 +696,14 @@
     18
    ],
    "latency_us": [
-    1824.3749996145198,
-    2480.333000221435,
-    1928.4169998172729,
-    2436.2080002902076
+    1795.6249998860585,
+    2384.625000104279,
+    1852.20800017305,
+    2350.49999992043
    ],
-   "speedup_fixed": 0.7355363168782765,
-   "speedup_naive": 0.9460479760276892,
-   "speedup_neurosymbolic": 0.7488584716071843,
+   "speedup_fixed": 0.7530009958830157,
+   "speedup_naive": 0.9694510550209776,
+   "speedup_neurosymbolic": 0.7639332056783001,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -729,14 +733,14 @@
     36
    ],
    "latency_us": [
-    1877.749999948719,
-    2475.4169999141595,
-    1923.750000059954,
-    2121.7080002315925
+    1852.7499998981511,
+    2406.000000064523,
+    1882.9590001132601,
+    2091.7080000799615
    ],
-   "speedup_fixed": 0.7585590629836646,
-   "speedup_naive": 0.9760883690137485,
-   "speedup_neurosymbolic": 0.8850181079317962,
+   "speedup_fixed": 0.7700540315247152,
+   "speedup_naive": 0.9839566340991536,
+   "speedup_neurosymbolic": 0.8857593888952591,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -763,14 +767,14 @@
     18
    ],
    "latency_us": [
-    2450.3330000698043,
-    2294.333000008919,
-    2530.0000002062006,
-    2217.082999777631
+    2403.208000032464,
+    2209.6659999988333,
+    2467.084000045361,
+    2177.0000000742584
    ],
-   "speedup_fixed": 1.0679936173433755,
-   "speedup_naive": 0.9685110671423307,
-   "speedup_neurosymbolic": 1.105205804345425,
+   "speedup_fixed": 1.0875888030289342,
+   "speedup_naive": 0.974108704846806,
+   "speedup_neurosymbolic": 1.1039081304320117,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -800,14 +804,14 @@
     18
    ],
    "latency_us": [
-    2483.9159996190574,
-    2267.7080000903516,
-    2593.7089999388263,
-    2259.6670000893937
+    2428.6249999931897,
+    2215.834000026007,
+    2479.37499989348,
+    2190.7079999436974
    ],
-   "speedup_fixed": 1.0953420808675947,
-   "speedup_naive": 0.9576694994225032,
-   "speedup_neurosymbolic": 1.0992398435348183,
+   "speedup_fixed": 1.0960320132124903,
+   "speedup_naive": 0.979531131876997,
+   "speedup_neurosymbolic": 1.1086027896258228,
    "outputs_match": true,
    "rewrites_applied": [
     "eliminate-identity",
@@ -839,14 +843,14 @@
     16
    ],
    "latency_us": [
-    8904.583000003186,
-    9284.165999815741,
-    8964.832999936334,
-    9284.084000228177
+    8660.87500003232,
+    9008.833000052618,
+    8778.790999940611,
+    9017.70900009069
    ],
-   "speedup_fixed": 0.9591150136888883,
-   "speedup_naive": 0.9932792947806639,
-   "speedup_neurosymbolic": 0.959123484856916,
+   "speedup_fixed": 0.9613759073990753,
+   "speedup_naive": 0.9865680821073096,
+   "speedup_neurosymbolic": 0.9604296390519165,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -878,25 +882,25 @@
     17
    ],
    "latency_us": [
-    9480.16699976506,
-    9739.83300036707,
-    9995.041999900423,
-    9639.8330001648
+    8879.834000026676,
+    9119.957999928374,
+    8937.625000044136,
+    9125.125000082335
    ],
-   "speedup_fixed": 0.9733397892353777,
-   "speedup_naive": 0.9484869598206299,
-   "speedup_neurosymbolic": 0.9834368499540387,
+   "speedup_fixed": 0.9736704927913502,
+   "speedup_naive": 0.9935339645580147,
+   "speedup_neurosymbolic": 0.9731191627453383,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "merge-scales",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "fuse-pair",
     "fuse-pair"
    ],
@@ -915,17 +919,17 @@
     42,
     14,
     24,
-    16
+    17
    ],
    "latency_us": [
-    665.000000026339,
-    580.4170000374143,
-    686.666000092373,
-    573.8330000895076
+    668.0419999156584,
+    563.3329999454872,
+    676.8749999537249,
+    568.6669999249716
    ],
-   "speedup_fixed": 1.1457279851959408,
-   "speedup_naive": 0.9684475420901582,
-   "speedup_neurosymbolic": 1.1588737488478547,
+   "speedup_fixed": 1.1858740744467369,
+   "speedup_naive": 0.9869503231192311,
+   "speedup_neurosymbolic": 1.1747507768233396,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -934,7 +938,6 @@
     "eliminate-identity",
     "fuse-pair",
     "eliminate-identity",
-    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -959,36 +962,28 @@
     47,
     20,
     25,
-    25
+    33
    ],
    "latency_us": [
-    683.707999996841,
-    638.2919996212877,
-    696.0000000617583,
-    657.7500003004388
+    654.6249999246356,
+    625.667000122121,
+    650.7909999982076,
+    587.833000054161
    ],
-   "speedup_fixed": 1.0711523885658907,
-   "speedup_naive": 0.9823390803680652,
-   "speedup_neurosymbolic": 1.0394648417857018,
+   "speedup_fixed": 1.046283406024071,
+   "speedup_naive": 1.0058912921758885,
+   "speedup_neurosymbolic": 1.113624107296325,
    "outputs_match": true,
    "rewrites_applied": [
     "eliminate-identity",
     "remove-dead",
     "eliminate-identity",
+    "eliminate-identity",
     "fuse-attention",
-    "merge-scales",
-    "fuse-pair",
-    "fuse-pair",
+    "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
-    "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair"
+    "merge-scales"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
@@ -1005,17 +1000,17 @@
     42,
     14,
     24,
-    16
+    17
    ],
    "latency_us": [
-    635.8329997055989,
-    503.75000000713044,
-    661.7499998355925,
-    514.41599998725
+    621.4999998519488,
+    497.624999979962,
+    633.8749999486026,
+    496.5829998582194
    ],
-   "speedup_fixed": 1.2621995031197992,
-   "speedup_naive": 0.9608356628085645,
-   "speedup_neurosymbolic": 1.2360288166024354,
+   "speedup_fixed": 1.2489324287907058,
+   "speedup_naive": 0.980477223273268,
+   "speedup_neurosymbolic": 1.25155311404014,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1023,10 +1018,9 @@
     "remove-dead",
     "fuse-pair",
     "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "eliminate-identity",
+    "fuse-pair",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -1049,17 +1043,17 @@
     45,
     14,
     24,
-    16
+    17
    ],
    "latency_us": [
-    638.6250001924054,
-    506.91699971139315,
-    645.9589999394666,
-    514.0829998708796
+    634.6669999857113,
+    491.45899993163766,
+    638.1670000337181,
+    493.9999998896383
    ],
-   "speedup_fixed": 1.2598216287005537,
-   "speedup_naive": 0.9886463386255963,
-   "speedup_neurosymbolic": 1.2422604916964899,
+   "speedup_fixed": 1.2913935853733354,
+   "speedup_naive": 0.99451554209506,
+   "speedup_neurosymbolic": 1.2847510124038435,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1067,13 +1061,12 @@
     "eliminate-identity",
     "remove-dead",
     "fuse-pair",
-    "merge-scales",
+    "eliminate-identity",
     "eliminate-identity",
     "merge-scales",
+    "merge-scales",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair",
-    "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -1099,24 +1092,24 @@
     19
    ],
    "latency_us": [
-    1960.749999852851,
-    2459.5830000180285,
-    1911.0419998469297,
-    2466.207999987091
+    1903.3330002002913,
+    2380.457999834107,
+    1859.7499999941647,
+    2384.6249998769053
    ],
-   "speedup_fixed": 0.7971879785469647,
-   "speedup_naive": 1.0260109406333837,
-   "speedup_neurosymbolic": 0.7950464842637418,
+   "speedup_fixed": 0.7995658819995706,
+   "speedup_naive": 1.0234348703891725,
+   "speedup_neurosymbolic": 0.7981686849288847,
    "outputs_match": true,
    "rewrites_applied": [
     "remove-dead",
+    "fuse-attention",
+    "fuse-attention",
+    "fuse-pair",
+    "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair",
-    "eliminate-identity",
-    "fuse-attention",
-    "fuse-attention",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -1140,26 +1133,26 @@
     19
    ],
    "latency_us": [
-    1953.250000042317,
-    2455.916000144498,
-    1910.5420001324092,
-    2452.7089999537566
+    1921.6250000226864,
+    2384.8749999615393,
+    1849.9590000828903,
+    2395.167000031506
    ],
-   "speedup_fixed": 0.7953244328907806,
-   "speedup_naive": 1.0223538660269955,
-   "speedup_neurosymbolic": 0.7963643465568657,
+   "speedup_fixed": 0.8057550186293522,
+   "speedup_naive": 1.03873923688935,
+   "speedup_neurosymbolic": 0.8022927002573972,
    "outputs_match": true,
    "rewrites_applied": [
     "eliminate-identity",
     "remove-dead",
+    "fuse-attention",
+    "fuse-pair",
     "eliminate-identity",
-    "eliminate-identity",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "eliminate-identity",
     "fuse-attention",
-    "fuse-attention",
+    "eliminate-identity",
+    "fuse-pair",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -1180,34 +1173,37 @@
     42,
     14,
     24,
-    17
+    14
    ],
    "latency_us": [
-    2570.9169999572623,
-    2273.5000002285233,
-    2549.416999954701,
-    2246.250000098371
+    2510.457999960636,
+    2196.707999928549,
+    2475.834000051691,
+    2174.8330000264104
    ],
-   "speedup_fixed": 1.130819001407013,
-   "speedup_naive": 1.0084333006342012,
-   "speedup_neurosymbolic": 1.1445373399419803,
+   "speedup_fixed": 1.1428273580477206,
+   "speedup_naive": 1.0139847824645036,
+   "speedup_neurosymbolic": 1.1543221939018535,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
     "remove-dead",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair",
-    "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fold-constant",
-    "remove-dead",
-    "fuse-pair"
+    "remove-dead"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
@@ -1224,33 +1220,36 @@
     55,
     29,
     29,
-    38
+    35
    ],
    "latency_us": [
-    2743.084000030649,
-    2549.457999975857,
-    2583.9579998319095,
-    2548.750000187283
+    2708.0409997779498,
+    2535.3329999688867,
+    2544.6249999276915,
+    2543.7089998376905
    ],
-   "speedup_fixed": 1.0759479073813436,
-   "speedup_naive": 1.0615822703809779,
-   "speedup_neurosymbolic": 1.0762467875739425,
+   "speedup_fixed": 1.0681204401201667,
+   "speedup_naive": 1.06422007166278,
+   "speedup_neurosymbolic": 1.0646033016947871,
    "outputs_match": true,
    "rewrites_applied": [
     "merge-scales",
     "remove-dead",
+    "fuse-pair",
+    "eliminate-identity",
     "merge-scales",
     "merge-scales",
     "merge-scales",
     "eliminate-identity",
+    "eliminate-identity",
+    "fuse-pair",
     "fuse-pair",
     "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
-    "eliminate-identity",
     "merge-scales",
-    "eliminate-identity",
+    "fuse-pair",
     "merge-scales",
     "fuse-pair"
    ],
@@ -1269,23 +1268,27 @@
     42,
     14,
     24,
-    19
+    14
    ],
    "latency_us": [
-    9532.417000173155,
-    9329.083000011451,
-    9152.207999704842,
-    9380.125000006956
+    9446.08400004654,
+    9244.874999922104,
+    9072.12500010246,
+    9256.667000045127
    ],
-   "speedup_fixed": 1.0217957113428462,
-   "speedup_naive": 1.0415428714557813,
-   "speedup_neurosymbolic": 1.016235604553893,
+   "speedup_fixed": 1.0217643829825855,
+   "speedup_naive": 1.0412206621866273,
+   "speedup_neurosymbolic": 1.020462764837548,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
     "remove-dead",
     "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
@@ -1293,7 +1296,9 @@
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair"
+    "fuse-pair",
+    "fold-constant",
+    "remove-dead"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
@@ -1310,26 +1315,24 @@
     52,
     16,
     26,
-    21
+    16
    ],
    "latency_us": [
-    9903.12499970969,
-    9632.124999825464,
-    9273.749999920256,
-    9467.99999974246
+    9794.750000082786,
+    9479.042000066329,
+    9199.624999837397,
+    9513.792000007015
    ],
-   "speedup_fixed": 1.0281350169240053,
-   "speedup_naive": 1.0678662892351902,
-   "speedup_neurosymbolic": 1.0459574355702435,
+   "speedup_fixed": 1.0333058973696125,
+   "speedup_naive": 1.0646901368540465,
+   "speedup_neurosymbolic": 1.0295316525813853,
    "outputs_match": true,
    "rewrites_applied": [
-    "eliminate-identity",
     "remove-dead",
     "eliminate-identity",
     "eliminate-identity",
     "eliminate-identity",
     "eliminate-identity",
-    "fuse-attention",
     "eliminate-identity",
     "fuse-attention",
     "fuse-pair",
@@ -1338,11 +1341,19 @@
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
+    "eliminate-identity",
+    "fuse-attention",
+    "fuse-pair",
     "merge-scales",
     "merge-scales",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair"
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
+    "fold-constant",
+    "remove-dead"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
@@ -1362,14 +1373,14 @@
     25
    ],
    "latency_us": [
-    845.5409997623065,
-    761.9590001013421,
-    897.5410000857664,
-    742.7909999933036
+    795.1669999783917,
+    697.708999950919,
+    824.7079999819107,
+    688.0420000925369
    ],
-   "speedup_fixed": 1.109693565729715,
-   "speedup_naive": 0.942063927643984,
-   "speedup_neurosymbolic": 1.1383296240395067,
+   "speedup_fixed": 1.139682876434629,
+   "speedup_naive": 0.9641800491759909,
+   "speedup_neurosymbolic": 1.1556954370103092,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1393,14 +1404,14 @@
     44
    ],
    "latency_us": [
-    838.7500001845183,
-    829.166000130499,
-    874.0000002944726,
-    862.4590000181342
+    832.7919999828737,
+    799.5839998784504,
+    850.7500001542212,
+    833.4169999670848
    ],
-   "speedup_fixed": 1.0115586023215024,
-   "speedup_naive": 0.9596681921074627,
-   "speedup_neurosymbolic": 0.9725099977701926,
+   "speedup_fixed": 1.0415315965670542,
+   "speedup_naive": 0.9788915660674791,
+   "speedup_neurosymbolic": 0.9992500753113557,
    "outputs_match": true,
    "rewrites_applied": [
     "merge-scales",
@@ -1424,14 +1435,14 @@
     25
    ],
    "latency_us": [
-    787.2499995755788,
-    664.6249998993881,
-    798.7500002855086,
-    634.417000128451
+    756.1249999525899,
+    626.6249999953288,
+    768.4160000280826,
+    608.9170001359889
    ],
-   "speedup_fixed": 1.1845025385664907,
-   "speedup_naive": 0.9856025030287084,
-   "speedup_neurosymbolic": 1.2409030644137586,
+   "speedup_fixed": 1.2066626769730324,
+   "speedup_naive": 0.9840047577418435,
+   "speedup_neurosymbolic": 1.2417538018871621,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1452,23 +1463,24 @@
     46,
     30,
     35,
-    44
+    38
    ],
    "latency_us": [
-    791.9170002423925,
-    760.7500001540757,
-    819.5410000553238,
-    816.2499998434214
+    801.2920000055601,
+    711.0000001375738,
+    789.1660000041156,
+    710.9999999102001
    ],
-   "speedup_fixed": 1.0409687809162071,
-   "speedup_naive": 0.9662933278370862,
-   "speedup_neurosymbolic": 0.97018928072809,
+   "speedup_fixed": 1.12699296744095,
+   "speedup_naive": 1.015365588483768,
+   "speedup_neurosymbolic": 1.1269929678013557,
    "outputs_match": true,
    "rewrites_applied": [
     "merge-scales",
-    "merge-scales"
+    "merge-scales",
+    "fuse-attention"
    ],
-   "attention_fused_by_ns": false,
+   "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
   },
   {
@@ -1483,20 +1495,26 @@
     37,
     22,
     32,
-    37
+    22
    ],
    "latency_us": [
-    2498.3330004033633,
-    3130.042000066169,
-    2574.5409998307878,
-    2492.291999715235
+    2475.959000094008,
+    3100.8339999516465,
+    2540.2910000593693,
+    3075.0420000913437
    ],
-   "speedup_fixed": 0.7981787465952689,
-   "speedup_naive": 0.9703993840329467,
-   "speedup_neurosymbolic": 1.0024238735624953,
+   "speedup_fixed": 0.7984816343385739,
+   "speedup_naive": 0.974675342327372,
+   "speedup_neurosymbolic": 0.8051789211400885,
    "outputs_match": true,
-   "rewrites_applied": [],
-   "attention_fused_by_ns": false,
+   "rewrites_applied": [
+    "fuse-attention",
+    "fuse-attention",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair"
+   ],
+   "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
   },
   {
@@ -1511,17 +1529,17 @@
     50,
     34,
     39,
-    44
+    42
    ],
    "latency_us": [
-    2594.084000065777,
-    2901.8749996794213,
-    2632.1249997636187,
-    2612.333999877592
+    2589.8330000018177,
+    2874.4999999616994,
+    2590.3749999542924,
+    2536.416999873836
    ],
-   "speedup_fixed": 0.8939337498522002,
-   "speedup_naive": 0.9855474190240745,
-   "speedup_neurosymbolic": 0.9930139102378678,
+   "speedup_fixed": 0.9009681683897461,
+   "speedup_naive": 0.999790763903881,
+   "speedup_neurosymbolic": 1.0210596286535845,
    "outputs_match": true,
    "rewrites_applied": [
     "eliminate-identity",
@@ -1529,7 +1547,9 @@
     "merge-scales",
     "merge-scales",
     "merge-scales",
-    "merge-scales"
+    "eliminate-identity",
+    "merge-scales",
+    "eliminate-identity"
    ],
    "attention_fused_by_ns": false,
    "gpu_measurements_at_search_time": 0
@@ -1549,14 +1569,14 @@
     22
    ],
    "latency_us": [
-    3364.9590000095486,
-    3112.249999958294,
-    3433.374999985972,
-    3078.499999901396
+    3346.584000155417,
+    3041.9160000292322,
+    3400.3330001723953,
+    3037.0419999599108
    ],
-   "speedup_fixed": 1.0811981685451493,
-   "speedup_naive": 0.980073251544995,
-   "speedup_neurosymbolic": 1.0930514861514788,
+   "speedup_fixed": 1.1001566118601753,
+   "speedup_naive": 0.9841930187383844,
+   "speedup_neurosymbolic": 1.1019221993635888,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1583,23 +1603,23 @@
     22
    ],
    "latency_us": [
-    3392.9159999388503,
-    3098.1250001786975,
-    3442.54199990246,
-    3096.08300040054
+    3354.4170000823215,
+    3049.2079999930866,
+    3403.7919999718724,
+    3037.250000033964
    ],
-   "speedup_fixed": 1.095151422148283,
-   "speedup_naive": 0.9855844896111607,
-   "speedup_neurosymbolic": 1.0958737215700964,
+   "speedup_fixed": 1.1000945163760316,
+   "speedup_naive": 0.9854941195319928,
+   "speedup_neurosymbolic": 1.1044257140652929,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-pair",
     "fuse-pair",
-    "eliminate-identity",
-    "fuse-attention",
     "fuse-pair",
-    "eliminate-identity"
+    "eliminate-identity",
+    "eliminate-identity",
+    "fuse-attention"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
@@ -1619,14 +1639,14 @@
     22
    ],
    "latency_us": [
-    12251.374999777909,
-    12507.708000157436,
-    12395.292000292102,
-    12508.958000125858
+    12205.917000073896,
+    12382.291999983863,
+    12285.375000146814,
+    12389.166000048135
    ],
-   "speedup_fixed": 0.9795059973916643,
-   "speedup_naive": 0.9883893819919045,
-   "speedup_neurosymbolic": 0.9794081169394478,
+   "speedup_fixed": 0.985755868145397,
+   "speedup_naive": 0.9935323097526962,
+   "speedup_neurosymbolic": 0.9852089317413676,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1650,19 +1670,20 @@
     47,
     30,
     35,
-    46
+    45
    ],
    "latency_us": [
-    13053.58299987347,
-    12537.583999801427,
-    12729.915999898367,
-    12910.416000067926
+    12990.124999987529,
+    12461.250000114887,
+    12661.083000011786,
+    12770.584000008967
    ],
-   "speedup_fixed": 1.0411561749121852,
-   "speedup_naive": 1.025425698015422,
-   "speedup_neurosymbolic": 1.0110892631038992,
+   "speedup_fixed": 1.0424415688528652,
+   "speedup_naive": 1.0259884561198624,
+   "speedup_neurosymbolic": 1.0171911480303806,
    "outputs_match": true,
    "rewrites_applied": [
+    "merge-scales",
     "merge-scales"
    ],
    "attention_fused_by_ns": false,
@@ -1683,14 +1704,14 @@
     37
    ],
    "latency_us": [
-    1018.9159997935349,
-    932.8330002063012,
-    1027.9160001118726,
-    909.7500001189474
+    968.917000136571,
+    922.3750000728614,
+    1057.2500000307627,
+    895.9580000009737
    ],
-   "speedup_fixed": 1.09228125459562,
-   "speedup_naive": 0.9912444204415942,
-   "speedup_neurosymbolic": 1.1199956028143054,
+   "speedup_fixed": 1.0504588698306363,
+   "speedup_naive": 0.9164502247419044,
+   "speedup_neurosymbolic": 1.0814312725992938,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1715,22 +1736,25 @@
     58,
     36,
     46,
-    40
+    37
    ],
    "latency_us": [
-    1042.2499999549473,
-    962.6250002838788,
-    1052.0830001041759,
-    912.8330002567964
+    1005.5000000193104,
+    911.2500001720036,
+    1040.999999986525,
+    930.8749999945576
    ],
-   "speedup_fixed": 1.0827165299546417,
-   "speedup_naive": 0.9906537790761233,
-   "speedup_neurosymbolic": 1.1417751107395806,
+   "speedup_fixed": 1.1034293550941197,
+   "speedup_naive": 0.9658981748629452,
+   "speedup_neurosymbolic": 1.080166510031088,
    "outputs_match": true,
    "rewrites_applied": [
     "eliminate-identity",
     "fuse-attention",
     "fuse-attention",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "merge-scales",
     "merge-scales",
     "fuse-pair",
@@ -1752,21 +1776,23 @@
     53,
     32,
     42,
-    36
+    34
    ],
    "latency_us": [
-    937.9999996781407,
-    852.624999879481,
-    1016.1660002268036,
-    810.1249995888793
+    936.5420000904123,
+    829.1249998819694,
+    998.1250000237196,
+    820.9170000554877
    ],
-   "speedup_fixed": 1.1001319452405542,
-   "speedup_naive": 0.923077528148731,
-   "speedup_neurosymbolic": 1.1578460116082767,
+   "speedup_fixed": 1.1295546512573307,
+   "speedup_naive": 0.9383013150338446,
+   "speedup_neurosymbolic": 1.140848587649067,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
+    "fuse-pair",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
@@ -1791,14 +1817,14 @@
     57
    ],
    "latency_us": [
-    999.7500001190929,
-    963.0419999666628,
-    1019.2499998993299,
-    1053.4160001043347
+    986.5419999641745,
+    924.8329999991256,
+    993.458000039027,
+    1047.5840001618053
    ],
-   "speedup_fixed": 1.0381167178105428,
-   "speedup_naive": 0.98086828571777,
-   "speedup_neurosymbolic": 0.94905526403631,
+   "speedup_fixed": 1.0667244788681927,
+   "speedup_naive": 0.993038457514479,
+   "speedup_neurosymbolic": 0.9417306868106018,
    "outputs_match": true,
    "rewrites_applied": [
     "merge-scales",
@@ -1806,8 +1832,8 @@
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "eliminate-identity",
     "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
     "fuse-pair"
    ],
@@ -1829,24 +1855,24 @@
     32
    ],
    "latency_us": [
-    3396.5409998018004,
-    3930.374999981723,
-    3339.5840000594035,
-    3886.0419999764417
+    3138.7090000407625,
+    3732.1659999633994,
+    3195.5410001955897,
+    3716.832999998587
    ],
-   "speedup_fixed": 0.864177336721711,
-   "speedup_naive": 1.0170551181648324,
-   "speedup_neurosymbolic": 0.8740361014683812,
+   "speedup_fixed": 0.8409885841282363,
+   "speedup_naive": 0.9822152179704943,
+   "speedup_neurosymbolic": 0.8444579027473,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "fuse-attention",
     "fuse-attention",
+    "fuse-pair",
+    "fuse-pair",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair"
@@ -1866,17 +1892,17 @@
     62,
     35,
     45,
-    54
+    35
    ],
    "latency_us": [
-    3448.7079997234105,
-    4025.1249997709238,
-    3392.166999674373,
-    3425.4580000379065
+    3222.7090000560565,
+    3787.1249999170686,
+    3244.499999937034,
+    3775.458999825787
    ],
-   "speedup_fixed": 0.8567952547857972,
-   "speedup_naive": 1.0166681062737963,
-   "speedup_neurosymbolic": 1.006787413445223,
+   "speedup_fixed": 0.8509645179725064,
+   "speedup_naive": 0.9932837109319155,
+   "speedup_neurosymbolic": 0.8535939604177303,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-pair",
@@ -1886,9 +1912,18 @@
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair"
+    "fuse-pair",
+    "fuse-attention",
+    "eliminate-identity",
+    "eliminate-identity",
+    "eliminate-identity",
+    "eliminate-identity",
+    "fuse-attention",
+    "eliminate-identity",
+    "fuse-pair",
+    "merge-scales"
    ],
-   "attention_fused_by_ns": false,
+   "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
   },
   {
@@ -1906,14 +1941,14 @@
     32
    ],
    "latency_us": [
-    4649.333000088518,
-    4200.834000130271,
-    4683.540999849356,
-    4169.4169999573205
+    4498.583999975381,
+    4075.4589999778545,
+    4560.165999919263,
+    4090.625000117143
    ],
-   "speedup_fixed": 1.106764275842449,
-   "speedup_naive": 0.992696124628366,
-   "speedup_neurosymbolic": 1.1151038622752558,
+   "speedup_fixed": 1.1038226614474163,
+   "speedup_naive": 0.9864956670557666,
+   "speedup_neurosymbolic": 1.0997302367844901,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1946,14 +1981,14 @@
     32
    ],
    "latency_us": [
-    4632.125000171072,
-    4150.041999764653,
-    4676.41699970045,
-    4153.624999617023
+    4586.791000065205,
+    4129.541000111203,
+    4625.875000101587,
+    4197.583999939525
    ],
-   "speedup_fixed": 1.1161634027881544,
-   "speedup_naive": 0.9905286462836366,
-   "speedup_neurosymbolic": 1.115200577952552,
+   "speedup_fixed": 1.1107265916337163,
+   "speedup_naive": 0.9915510038564543,
+   "speedup_neurosymbolic": 1.0927216704016613,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -1986,14 +2021,14 @@
     32
    ],
    "latency_us": [
-    16600.79199973552,
-    16590.166999776557,
-    16560.125000069092,
-    16547.042000183865
+    16388.750000032815,
+    16274.54200001921,
+    16367.208000019673,
+    16289.459000063289
    ],
-   "speedup_fixed": 1.0006404396025133,
-   "speedup_naive": 1.0024557181583025,
-   "speedup_neurosymbolic": 1.0032483146867615,
+   "speedup_fixed": 1.007017586117844,
+   "speedup_naive": 1.0013161682806937,
+   "speedup_neurosymbolic": 1.0060954142165888,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
@@ -2026,32 +2061,32 @@
     34
    ],
    "latency_us": [
-    17067.62499998149,
-    16663.832999711303,
-    16694.583000116836,
-    16638.41700019475
+    16824.125000084678,
+    16455.458000109502,
+    16547.166999998808,
+    16415.79199986154
    ],
-   "speedup_fixed": 1.0242316398800433,
-   "speedup_naive": 1.0223450924088395,
-   "speedup_neurosymbolic": 1.0257962040368214,
+   "speedup_fixed": 1.0224039343039084,
+   "speedup_naive": 1.0167374874554593,
+   "speedup_neurosymbolic": 1.0248744014438402,
    "outputs_match": true,
    "rewrites_applied": [
-    "fuse-pair",
     "fuse-attention",
     "fuse-attention",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
+    "merge-scales",
+    "fuse-pair",
+    "fuse-pair",
+    "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "merge-scales",
+    "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
-    "fuse-pair",
-    "merge-scales",
-    "eliminate-identity",
-    "eliminate-identity",
-    "fuse-pair"
+    "eliminate-identity"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
@@ -2071,14 +2106,14 @@
     72
    ],
    "latency_us": [
-    1635.1670001313323,
-    1241.1249999786378,
-    1664.124999933847,
-    1675.2500000620785
+    1681.5410001527198,
+    1237.3750000733708,
+    1717.7919999085134,
+    1688.083999852097
    ],
-   "speedup_fixed": 1.3174877632466324,
-   "speedup_naive": 0.982598663078996,
-   "speedup_neurosymbolic": 0.9760734219195578,
+   "speedup_fixed": 1.3589582786568437,
+   "speedup_naive": 0.9788967466621545,
+   "speedup_neurosymbolic": 0.9961240082247386,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-pair",
@@ -2100,28 +2135,29 @@
     86,
     39,
     69,
-    77
+    76
    ],
    "latency_us": [
-    1651.5419997631398,
-    1314.250000177708,
-    1674.5420002735045,
-    1685.540999915247
+    1682.5830000470887,
+    1399.542000172005,
+    1711.1669999394508,
+    1709.7500001455046
    ],
-   "speedup_fixed": 1.2566421910137526,
-   "speedup_naive": 0.9862649007868372,
-   "speedup_neurosymbolic": 0.9798290280961324,
+   "speedup_fixed": 1.20223830355952,
+   "speedup_naive": 0.983295610601786,
+   "speedup_neurosymbolic": 0.984110542420761,
    "outputs_match": true,
    "rewrites_applied": [
-    "merge-scales",
-    "merge-scales",
-    "fuse-pair",
-    "fuse-pair",
-    "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
     "merge-scales",
-    "eliminate-identity"
+    "fuse-pair",
+    "merge-scales",
+    "fuse-pair",
+    "fuse-pair",
+    "eliminate-identity",
+    "eliminate-identity",
+    "merge-scales"
    ],
    "attention_fused_by_ns": false,
    "gpu_measurements_at_search_time": 0
@@ -2141,14 +2177,14 @@
     72
    ],
    "latency_us": [
-    1523.7499997056148,
-    998.2080000554561,
-    1578.3750000082364,
-    1544.1670002473984
+    1539.2079999401176,
+    987.709000128234,
+    1568.2079999805865,
+    1553.4999999999854
    ],
-   "speedup_fixed": 1.5264854615680918,
-   "speedup_naive": 0.9653916209377768,
-   "speedup_neurosymbolic": 0.986777984156822,
+   "speedup_fixed": 1.5583618249305033,
+   "speedup_naive": 0.9815075550942044,
+   "speedup_neurosymbolic": 0.9908001287030138,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-pair",
@@ -2170,26 +2206,27 @@
     81,
     25,
     65,
-    74
+    73
    ],
    "latency_us": [
-    1527.4580000550486,
-    1009.0000000673172,
-    1569.250000102329,
-    1526.9579998857807
+    1565.1670000806917,
+    997.6249998544517,
+    1581.0830000191345,
+    1587.7089999776217
    ],
-   "speedup_fixed": 1.5138334984669393,
-   "speedup_naive": 0.9733681694793339,
-   "speedup_neurosymbolic": 1.0003274485410243,
+   "speedup_fixed": 1.5688931214725386,
+   "speedup_naive": 0.9899334823420085,
+   "speedup_neurosymbolic": 0.9858021842181106,
    "outputs_match": true,
    "rewrites_applied": [
+    "eliminate-identity",
+    "eliminate-identity",
+    "eliminate-identity",
     "merge-scales",
     "fuse-pair",
-    "eliminate-identity",
-    "eliminate-identity",
     "fuse-pair",
-    "eliminate-identity",
-    "fuse-pair"
+    "fuse-pair",
+    "eliminate-identity"
    ],
    "attention_fused_by_ns": false,
    "gpu_measurements_at_search_time": 0
@@ -2206,23 +2243,22 @@
     75,
     24,
     64,
-    53
+    59
    ],
    "latency_us": [
-    5456.62500007893,
-    7288.875000085682,
-    5524.457999854349,
-    6097.250000038912
+    5372.749999878579,
+    7247.042000017245,
+    5490.540999971927,
+    5819.834000021729
    ],
-   "speedup_fixed": 0.7486237588125446,
-   "speedup_naive": 0.9877213294449505,
-   "speedup_neurosymbolic": 0.8949321415464523,
+   "speedup_fixed": 0.7413714450483099,
+   "speedup_naive": 0.978546558509635,
+   "speedup_neurosymbolic": 0.9231792521674191,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
-    "fuse-attention",
-    "fuse-attention",
     "fuse-pair",
+    "fuse-attention",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair"
@@ -2242,29 +2278,25 @@
     80,
     31,
     66,
-    57
+    76
    ],
    "latency_us": [
-    5847.291999998561,
-    7295.333999991271,
-    5944.750000253407,
-    6420.207999781269
+    5506.041999979061,
+    7001.707999961582,
+    5481.16699997081,
+    5517.040999848177
    ],
-   "speedup_fixed": 0.8015112125100176,
-   "speedup_naive": 0.9836060388997532,
-   "speedup_neurosymbolic": 0.9107636388412608,
+   "speedup_fixed": 0.7863855504984316,
+   "speedup_naive": 1.0045382671260306,
+   "speedup_neurosymbolic": 0.998006358867114,
    "outputs_match": true,
    "rewrites_applied": [
-    "fuse-attention",
-    "fuse-attention",
-    "fuse-attention",
-    "fuse-pair",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
-    "fuse-pair"
+    "merge-scales"
    ],
-   "attention_fused_by_ns": true,
+   "attention_fused_by_ns": false,
    "gpu_measurements_at_search_time": 0
   },
   {
@@ -2282,14 +2314,14 @@
     72
    ],
    "latency_us": [
-    6736.415999966994,
-    6396.583000423561,
-    6836.749999820313,
-    6909.833000008803
+    6628.874999933032,
+    6283.374999838998,
+    6712.707999895429,
+    6732.708000072307
    ],
-   "speedup_fixed": 1.0531272711572617,
-   "speedup_naive": 0.9853243134740987,
-   "speedup_neurosymbolic": 0.9749028666768664,
+   "speedup_fixed": 1.054986372785786,
+   "speedup_naive": 0.9875112994690515,
+   "speedup_neurosymbolic": 0.9845778251279931,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-pair",
@@ -2314,27 +2346,27 @@
     75
    ],
    "latency_us": [
-    6940.541999938432,
-    6279.334000282688,
-    6934.958000329061,
-    6972.000000132539
+    6888.500000059139,
+    6117.708999909155,
+    6811.542000150439,
+    6857.124999896769
    ],
-   "speedup_fixed": 1.105299065096072,
-   "speedup_naive": 1.0008051958799327,
-   "speedup_neurosymbolic": 0.9954879517794738,
+   "speedup_fixed": 1.1259934070354491,
+   "speedup_naive": 1.0112981759353463,
+   "speedup_neurosymbolic": 1.0045755327725312,
    "outputs_match": true,
    "rewrites_applied": [
     "eliminate-identity",
-    "merge-scales",
-    "fuse-pair",
-    "fuse-pair",
+    "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
     "merge-scales",
+    "fuse-pair",
+    "fuse-pair",
+    "merge-scales",
     "merge-scales",
     "fuse-pair",
-    "fuse-pair",
-    "eliminate-identity"
+    "fuse-pair"
    ],
    "attention_fused_by_ns": false,
    "gpu_measurements_at_search_time": 0
@@ -2351,28 +2383,24 @@
     75,
     24,
     64,
-    24
+    53
    ],
    "latency_us": [
-    25754.083000265382,
-    26434.417000018584,
-    25495.79200012886,
-    26515.999999901396
+    25694.458999851122,
+    26416.833000212137,
+    25413.95899993404,
+    25163.87500008932
    ],
-   "speedup_fixed": 0.9742633249769524,
-   "speedup_naive": 1.0101307305980225,
-   "speedup_neurosymbolic": 0.9712657640805986,
+   "speedup_fixed": 0.9726547841539062,
+   "speedup_naive": 1.0110372413805269,
+   "speedup_neurosymbolic": 1.0210851468527768,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
     "fuse-attention",
     "fuse-pair",
-    "fuse-attention",
-    "fuse-attention",
-    "fuse-attention",
-    "fuse-attention",
-    "fuse-attention",
+    "fuse-pair",
     "fuse-pair",
     "fuse-pair"
    ],
@@ -2391,38 +2419,34 @@
     80,
     25,
     65,
-    40
+    54
    ],
    "latency_us": [
-    26091.54199990371,
-    26535.083999988274,
-    25705.334000122093,
-    25904.833000367944
+    27758.45900009699,
+    28418.00000010153,
+    27647.29199998328,
+    27419.333000125334
    ],
-   "speedup_fixed": 0.9832846958357185,
-   "speedup_naive": 1.01502443032951,
-   "speedup_neurosymbolic": 1.0072074967452258,
+   "speedup_fixed": 0.9767914350059054,
+   "speedup_naive": 1.0040209001342257,
+   "speedup_neurosymbolic": 1.0123681345556474,
    "outputs_match": true,
    "rewrites_applied": [
     "fuse-attention",
     "fuse-attention",
+    "eliminate-identity",
     "fuse-attention",
     "eliminate-identity",
     "eliminate-identity",
     "fuse-pair",
     "fuse-pair",
     "fuse-pair",
-    "eliminate-identity",
-    "merge-scales",
     "fuse-pair",
-    "fuse-attention",
-    "fuse-attention",
-    "fuse-pair",
-    "fuse-pair"
+    "merge-scales"
    ],
    "attention_fused_by_ns": true,
    "gpu_measurements_at_search_time": 0
   }
  ],
- "final_train_loss": 0.008999652229249477
+ "final_train_loss": 0.009245704859495163
 }

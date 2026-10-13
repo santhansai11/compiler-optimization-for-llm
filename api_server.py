@@ -235,7 +235,8 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             self._send_json({"runs": runs})
         elif path == "/api/research_results":
             names = ["real_graph_study", "cost_calibration", "rl_results", "neuro_symbolic_results",
-                     "compiler_comparison", "lm_full_eval", "learned_results", "lm_results"]
+                     "compiler_comparison", "lm_full_eval", "learned_results", "lm_results",
+                     "unseen_architecture", "learned_sensitivity"]
             out = {}
             for name in names:
                 f = PROJECT_ROOT / "docs" / "results" / f"{name}.json"

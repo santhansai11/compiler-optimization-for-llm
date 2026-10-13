@@ -91,7 +91,8 @@ def build_tables(per_family=100, seed=0, use_cache=True):
 
     if use_cache and CACHE.exists():
         data = pickle.loads(CACHE.read_bytes())
-        if (data["per_family"], data["seed"], data["calibrated"]) == (per_family, seed, CALIBRATED):
+        if (data["per_family"], data["seed"], data["calibrated"], data.get("constants")) \
+                == (per_family, seed, CALIBRATED, lo._constants()):
             return data["items"]
     rng = np.random.default_rng(seed)  # same generator order as learned_optimizer
     items, t0 = [], time.time()
@@ -102,7 +103,8 @@ def build_tables(per_family=100, seed=0, use_cache=True):
         print(f"  tabulated {family:10s} ({time.time() - t0:.0f}s)", flush=True)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     CACHE.write_bytes(pickle.dumps({"per_family": per_family, "seed": seed,
-                                    "calibrated": CALIBRATED, "items": items}))
+                                    "calibrated": CALIBRATED, "constants": lo._constants(),
+                                    "items": items}))
     return items
 
 

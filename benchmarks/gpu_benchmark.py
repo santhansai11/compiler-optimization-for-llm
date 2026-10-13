@@ -49,11 +49,12 @@ def run(device, repeats, warmup, workloads, names):
         for b, s, d in workloads:
             g = BUILDERS[name](b, s, d)
             opt, infos, ctime = run_pipeline(g, partition=False)
-            a, o, t = gpu_compare([(g, "composed"), (opt, "sdpa"), (opt, "auto")],
-                                  device, repeats=repeats, warmup=warmup)
+            a, o, t, cgn = gpu_compare([(g, "composed"), (opt, "sdpa"), (opt, "auto"),
+                                        (opt, "auto", True)],
+                                       device, repeats=repeats, warmup=warmup)
             denom = max(1e-6, float(np.abs(a["output"]).max()))
             rel = max(float(np.abs(a["output"] - x["output"]).max()) / denom
-                      for x in (o, t))
+                      for x in (o, t, cgn))
             row = {
                 "architecture": name, "batch": b, "seq": s, "d_model": d,
                 "nodes_original": g.node_count(), "nodes_optimized": opt.node_count(),
@@ -61,6 +62,9 @@ def run(device, repeats, warmup, workloads, names):
                 "latency_ms_optimized_sdpa": o["latency_min_s"] * 1e3,
                 "latency_ms_optimized_auto": t["latency_min_s"] * 1e3,
                 "speedup_sdpa": a["latency_min_s"] / o["latency_min_s"],
+                "latency_ms_optimized_codegen": cgn["latency_min_s"] * 1e3,
+                "speedup_codegen": a["latency_min_s"] / cgn["latency_min_s"],
+                "kernel_dispatches_codegen": cgn["kernel_dispatches"],
                 "speedup_auto": a["latency_min_s"] / t["latency_min_s"],
                 "tokens_per_s_original": b * s / a["latency_min_s"],
                 "tokens_per_s_auto": b * s / t["latency_min_s"],
@@ -90,6 +94,7 @@ def run(device, repeats, warmup, workloads, names):
             print(f"{name:24s} B{b} S{s} D{d}: {row['latency_ms_original']:8.3f} ms -> "
                   f"sdpa {row['latency_ms_optimized_sdpa']:8.3f} (x{row['speedup_sdpa']:.2f}) | "
                   f"auto {row['latency_ms_optimized_auto']:8.3f} (x{row['speedup_auto']:.2f}) "
+                  f"codegen {row['latency_ms_optimized_codegen']:8.3f} (x{row['speedup_codegen']:.2f}) "
                   f"modeled x{row['modeled_speedup']:.2f}  match={row['outputs_match']}", flush=True)
             rows.append(row)
     return rows
@@ -122,6 +127,9 @@ def main():
             "all_outputs_match": all(r["outputs_match"] for r in rows),
             "median_speedup_sdpa": float(np.median([r["speedup_sdpa"] for r in rows])),
             "median_speedup_auto": float(np.median([r["speedup_auto"] for r in rows])),
+            "median_speedup_codegen": float(np.median([r["speedup_codegen"] for r in rows])),
+            "max_speedup_codegen": float(max(r["speedup_codegen"] for r in rows)),
+            "min_speedup_codegen": float(min(r["speedup_codegen"] for r in rows)),
             "min_speedup_auto": float(min(r["speedup_auto"] for r in rows)),
             "max_speedup_auto": float(max(r["speedup_auto"] for r in rows)),
             "median_modeled_speedup": float(np.median([r["modeled_speedup"] for r in rows])),

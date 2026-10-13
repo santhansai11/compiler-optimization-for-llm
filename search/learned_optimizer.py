@@ -136,13 +136,19 @@ def evaluate_actions(graph):
     return rewards
 
 
+def _constants():
+    from utils import cost_model
+    return (DEVICE_PENALTY, PASS_PENALTY, cost_model.COMM_US)
+
+
 def build_dataset(per_family=100, seed=0, use_cache=True):
     if use_cache and CACHE_PATH.exists():
         data = pickle.loads(CACHE_PATH.read_bytes())
         from utils.cost_model import CALIBRATED
         if (data["per_family"] == per_family and data["seed"] == seed
                 and data.get("version") == FEATURE_VERSION
-                and data.get("calibrated") == CALIBRATED):
+                and data.get("calibrated") == CALIBRATED
+                and data.get("constants") == _constants()):
             return data["samples"]
     rng = np.random.default_rng(seed)
     samples = []
@@ -156,6 +162,7 @@ def build_dataset(per_family=100, seed=0, use_cache=True):
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     CACHE_PATH.write_bytes(pickle.dumps({"per_family": per_family, "seed": seed,
                                          "version": FEATURE_VERSION,
+                                         "constants": _constants(),
                                          "calibrated": __import__("utils.cost_model", fromlist=["x"]).CALIBRATED,
                                          "samples": samples}))
     return samples

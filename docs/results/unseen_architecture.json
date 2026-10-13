@@ -1,0 +1,133 @@
+{
+ "architecture": "Parallel-block (GPT-J style)",
+ "modeled": {
+  "none": 1.0,
+  "fixed": 1.1211958321993543,
+  "selector": 1.3176753958872318,
+  "rl": 1.3899242129152873,
+  "oracle": 1.43488334095495,
+  "graphs": 60,
+  "regret_pct_selector": 8.177012912918807,
+  "regret_pct_rl": 3.1081395616879828
+ },
+ "gpu": {
+  "device": "Apple M3 Pro GPU (Metal/MPS)",
+  "rows": [
+   {
+    "size": [
+     2,
+     128,
+     128
+    ],
+    "nodes": [
+     27,
+     12,
+     14
+    ],
+    "speedup_fixed": 0.9891499925121037,
+    "speedup_neurosymbolic": 1.0772806910461308,
+    "speedup_fixed_codegen": 1.2812901455208794,
+    "outputs_match": true,
+    "rewrites": [
+     "fuse-attention",
+     "fuse-attention",
+     "fuse-pair"
+    ]
+   },
+   {
+    "size": [
+     4,
+     64,
+     64
+    ],
+    "nodes": [
+     27,
+     12,
+     14
+    ],
+    "speedup_fixed": 1.1413608817162464,
+    "speedup_neurosymbolic": 1.302799433489034,
+    "speedup_fixed_codegen": 1.1574497514454216,
+    "outputs_match": true,
+    "rewrites": [
+     "fuse-attention",
+     "fuse-attention",
+     "fuse-pair"
+    ]
+   },
+   {
+    "size": [
+     8,
+     256,
+     256
+    ],
+    "nodes": [
+     27,
+     12,
+     12
+    ],
+    "speedup_fixed": 0.7771295215957194,
+    "speedup_neurosymbolic": 0.7777344489287528,
+    "speedup_fixed_codegen": 0.7735578837508471,
+    "outputs_match": true,
+    "rewrites": [
+     "fuse-attention",
+     "fuse-attention",
+     "fuse-pair",
+     "fuse-pair",
+     "fuse-pair"
+    ]
+   },
+   {
+    "size": [
+     4,
+     256,
+     512
+    ],
+    "nodes": [
+     27,
+     12,
+     12
+    ],
+    "speedup_fixed": 1.1001833640571395,
+    "speedup_neurosymbolic": 1.096689946118938,
+    "speedup_fixed_codegen": 1.0849909584714055,
+    "outputs_match": true,
+    "rewrites": [
+     "fuse-attention",
+     "fuse-attention",
+     "fuse-pair",
+     "fuse-pair",
+     "fuse-pair"
+    ]
+   },
+   {
+    "size": [
+     8,
+     512,
+     512
+    ],
+    "nodes": [
+     27,
+     12,
+     12
+    ],
+    "speedup_fixed": 0.9659580332919689,
+    "speedup_neurosymbolic": 0.9672244264600982,
+    "speedup_fixed_codegen": 0.9685759661579723,
+    "outputs_match": true,
+    "rewrites": [
+     "fuse-attention",
+     "fuse-attention",
+     "fuse-pair",
+     "fuse-pair",
+     "fuse-pair"
+    ]
+   }
+  ],
+  "geomean_speedup_fixed": 0.9860986745705118,
+  "geomean_speedup_neurosymbolic": 1.029745204467267,
+  "geomean_speedup_fixed_codegen": 1.0381030122421289,
+  "all_outputs_match": true
+ }
+}

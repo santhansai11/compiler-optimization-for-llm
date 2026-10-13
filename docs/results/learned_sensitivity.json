@@ -1,0 +1,57 @@
+[
+ {
+  "config": "baseline",
+  "comm_us": 50.0,
+  "device_penalty": 0.15,
+  "learned": 1.3721872796728831,
+  "fixed_1dev": 1.2375175746695521,
+  "fixed_4dev": 1.3239959421802763,
+  "oracle": 1.4272625962829817,
+  "regret_pct": 3.4536587912873893,
+  "best_plan_uses_multiple_devices_pct": 32.142857142857146
+ },
+ {
+  "config": "cheap transfer",
+  "comm_us": 10.0,
+  "device_penalty": 0.15,
+  "learned": 1.4247335852694072,
+  "fixed_1dev": 1.2375175746695521,
+  "fixed_4dev": 1.3753724996366476,
+  "oracle": 1.47596214933281,
+  "regret_pct": 3.116027956476764,
+  "best_plan_uses_multiple_devices_pct": 45.857142857142854
+ },
+ {
+  "config": "expensive transfer",
+  "comm_us": 150.0,
+  "device_penalty": 0.15,
+  "learned": 1.3192970151473915,
+  "fixed_1dev": 1.2375175746695521,
+  "fixed_4dev": 1.2744164275261167,
+  "oracle": 1.3500755901805157,
+  "regret_pct": 1.9698978419566269,
+  "best_plan_uses_multiple_devices_pct": 25.142857142857146
+ },
+ {
+  "config": "cheap devices",
+  "comm_us": 50.0,
+  "device_penalty": 0.05,
+  "learned": 1.4815461223770634,
+  "fixed_1dev": 1.2375175746695521,
+  "fixed_4dev": 1.471995942180276,
+  "oracle": 1.5077940132956538,
+  "regret_pct": 1.7888406344123247,
+  "best_plan_uses_multiple_devices_pct": 56.00000000000001
+ },
+ {
+  "config": "expensive devices",
+  "comm_us": 50.0,
+  "device_penalty": 0.3,
+  "learned": 1.2779922775906847,
+  "fixed_1dev": 1.2375175746695521,
+  "fixed_4dev": 1.1019959421802759,
+  "oracle": 1.3450211953119258,
+  "regret_pct": 4.25401663054144,
+  "best_plan_uses_multiple_devices_pct": 25.285714285714285
+ }
+]
