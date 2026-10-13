@@ -101,5 +101,34 @@ class TorchExecutorTests(unittest.TestCase):
                 self.assertLess(float(np.abs(res["output"] - ref).max()) / scale, 1e-3, name)
 
 
+class RealGraphTests(unittest.TestCase):
+    def test_traced_trained_model_reduces_and_matches_pytorch(self):
+        import numpy as np
+        import torch
+        from models.import_hf import import_module
+        from models.tiny_lm import WEIGHTS_PATH, make_torch_model
+        from utils.executor import execute
+        if not WEIGHTS_PATH.exists():
+            self.skipTest("no trained weights")
+        w = np.load(WEIGHTS_PATH)
+        vocab, d = w["tok.weight"].shape
+        model = make_torch_model(vocab, d, 2, w["pos"].shape[0])
+        model.load_state_dict({k: torch.from_numpy(w[k]) for k in model.state_dict()})
+        model.eval()
+        model.d_model, model.vocab = d, vocab
+        ids = torch.randint(0, vocab, (2, 32), generator=torch.Generator().manual_seed(0))
+        with torch.no_grad():
+            ref = model(ids).numpy()
+        graph, _ = import_module(model, ids, "tiny", "tiny")
+        opt, infos, _ = run_pipeline(graph, partition=False)
+        feed = ids.numpy().astype("float32")
+        out = execute(opt, feed=feed, repeats=1, warmup=0)["output"]
+        self.assertLess(float(np.abs(out - ref).max()), 1e-3)
+        self.assertLess(opt.node_count(), graph.node_count() * 0.5)
+        att = infos["attention_canonicalization"]
+        self.assertEqual((att["detected"], att["canonicalized"]), (2, 2))
+        self.assertGreater(infos["normalize"]["views_removed"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

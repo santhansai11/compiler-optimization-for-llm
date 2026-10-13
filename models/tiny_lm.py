@@ -31,14 +31,20 @@ def make_torch_model(vocab, d_model=64, n_layers=2, max_seq=64):
             self.ln2 = nn.LayerNorm(d_model)
             self.fc1 = nn.Linear(d_model, 4 * d_model)
             self.fc2 = nn.Linear(4 * d_model, d_model)
+            # GPT-2 style non-persistent causal mask buffer (keeps the
+            # state_dict unchanged; traces to a constant + torch.where).
+            self.register_buffer(
+                "bias", torch.tril(torch.ones(max_seq, max_seq, dtype=torch.bool)),
+                persistent=False)
 
         def forward(self, x):
             h = self.ln1(x)
             q, k, v = self.wq(h), self.wk(h), self.wv(h)
             s = (q @ k.transpose(-2, -1)) / math.sqrt(d_model)
             n = x.shape[1]
-            mask = torch.tril(torch.ones(n, n, device=x.device)) != 0
-            s = s.masked_fill(~mask, float("-inf"))
+            fill = torch.full([], torch.finfo(s.dtype).min, dtype=s.dtype,
+                              device=s.device)
+            s = torch.where(self.bias[:n, :n], s, fill)
             x = x + self.wo(torch.softmax(s, -1) @ v)
             h = self.ln2(x)
             return x + self.fc2(F.gelu(self.fc1(h), approximate="tanh"))

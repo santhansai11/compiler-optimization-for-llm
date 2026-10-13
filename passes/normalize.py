@@ -104,6 +104,7 @@ def normalize_graph(graph):
         "transposes_removed": 0,
         "transposes_folded": 0,
         "scales_merged": 0,
+        "views_removed": 0,
         "constants_folded": 0,
         "cse_merges": 0,
         "dead_nodes_removed": 0,
@@ -131,6 +132,7 @@ def normalize_graph(graph):
     (info["transposes_removed"],
      info["transposes_folded"]) = _simplify_transposes(normalized)
     info["scales_merged"] = _merge_scale_chains(normalized)
+    info["views_removed"] = _eliminate_view_pairs(normalized)
     info["constants_folded"] = _fold_constants(normalized)
     info["cse_merges"] = _eliminate_common_subexpressions(normalized)
     info["dead_nodes_removed"] = _eliminate_dead_code(normalized)
@@ -276,6 +278,92 @@ def _simplify_transposes(graph):
             changed = True
             break
     return removed, folded
+
+
+def _shape(g, node):
+    shape = g.nodes[node].get("shape")
+    return tuple(int(d) for d in shape) if shape is not None else None
+
+
+def _eliminate_view_pairs(graph):
+    """View algebra on Reshape nodes (real framework graphs are full of them).
+
+    * ``Reshape(Reshape(x))`` -> one Reshape, or nothing when the result has
+      the shape of ``x`` again.
+    * ``Reshape -> Linear -> Reshape`` where the first flattens the leading
+      dims and the second restores them: both views are dropped because the
+      linear layer acts on the last axis only.
+
+    Returns the number of Reshape nodes removed.
+    """
+    g = graph.graph
+    removed = 0
+    changed = True
+    while changed:
+        changed = False
+        for node in list(g.nodes()):
+            data = g.nodes[node]
+            if data.get("op_type") != "Reshape":
+                continue
+            preds = list(g.predecessors(node))
+            if len(preds) != 1:
+                continue
+            mid = preds[0]
+            mid_data = g.nodes[mid]
+            out_shape = _shape(g, node)
+
+            # (A) Reshape(Reshape(x))
+            if (mid_data.get("op_type") == "Reshape" and g.out_degree(mid) == 1
+                    and not mid_data.get("is_output")):
+                srcs = list(g.predecessors(mid))
+                if len(srcs) != 1:
+                    continue
+                src = srcs[0]
+                if out_shape is not None and out_shape == _shape(g, src) \
+                        and not data.get("is_output") \
+                        and not any(g.has_edge(src, c) for c in g.successors(node)):
+                    for succ in list(g.successors(node)):
+                        _replace_input(g, succ, node, src)
+                    g.remove_node(node)
+                    g.remove_node(mid)
+                    removed += 2
+                else:
+                    _replace_input(g, node, mid, src)
+                    g.remove_node(mid)
+                    removed += 1
+                changed = True
+                break
+
+            # (B) Reshape -> Linear -> Reshape
+            if (mid_data.get("op_type") in ("GEMM", "MatMul")
+                    and mid_data.get("weight") is not None
+                    and g.in_degree(mid) == 1 and g.out_degree(mid) == 1
+                    and not mid_data.get("is_output")):
+                first = list(g.predecessors(mid))[0]
+                fd = g.nodes[first]
+                if fd.get("op_type") != "Reshape" or g.out_degree(first) != 1 \
+                        or g.in_degree(first) != 1 or fd.get("is_output"):
+                    continue
+                src = list(g.predecessors(first))[0]
+                s_in, s_flat = _shape(g, src), _shape(g, first)
+                if not (s_in and s_flat and out_shape and len(s_in) >= 3
+                        and s_flat == (int(np.prod(s_in[:-1])), s_in[-1])
+                        and out_shape[:-1] == s_in[:-1]):
+                    continue
+                if any(g.has_edge(mid, c) for c in ()):
+                    continue
+                _replace_input(g, mid, first, src)
+                g.remove_node(first)
+                for succ in list(g.successors(node)):
+                    _replace_input(g, succ, node, mid)
+                mid_data["shape"] = out_shape
+                if data.get("is_output"):
+                    mid_data["is_output"] = True
+                g.remove_node(node)
+                removed += 2
+                changed = True
+                break
+    return removed
 
 
 def _merge_scale_chains(graph):

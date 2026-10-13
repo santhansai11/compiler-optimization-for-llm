@@ -76,7 +76,9 @@ def _make_traced(model, ids):
             self.inner = inner
 
         def forward(self, input_ids):
-            return self.inner(input_ids=input_ids, use_cache=False).logits
+            if hasattr(self.inner, "config"):  # HF models
+                return self.inner(input_ids=input_ids, use_cache=False).logits
+            return self.inner(input_ids)
 
     return make_fx(_Wrapper(model), tracing_mode="real")(ids)
 
@@ -108,25 +110,39 @@ def import_hf_graph(model_key, seq=None, batch=1):
     model.eval()
 
     ids = torch.ones((batch, seq), dtype=torch.long)
+    return import_module(model, ids, f"hf_{model_key.replace('-', '_')}", hf_id,
+                         label)
 
-    # Concrete (real-tensor) tracing: HF forward code contains data-shaped
-    # control flow that symbolic tracers cannot cross.
+
+def import_module(model, ids, name, source_id, label=None):
+    """Trace ANY causal-LM ``nn.Module`` (HF or custom) into the IR.
+
+    ``model(input_ids=ids, use_cache=False).logits`` is traced for HF models;
+    plain modules are traced through ``model(ids)``. Returns
+    ``(graph, import_info)``.
+    """
+    import torch
+
+    batch, seq = ids.shape
     traced = _make_traced(model, ids)
 
     from ir.graph import ComputationGraph
 
-    graph = ComputationGraph(f"hf_{model_key.replace('-', '_')}")
-    config = model.config
+    graph = ComputationGraph(name)
+    config = getattr(model, "config", None)
+    hidden = int(getattr(config, "hidden_size", 0) or
+                 getattr(model, "d_model", 0) or 0)
+    vocab = int(getattr(config, "vocab_size", 0) or getattr(model, "vocab", 0) or 0)
     graph.meta["config"] = {
         "batch": batch,
         "seq": seq,
-        "d_model": int(config.hidden_size),
+        "d_model": hidden,
         "input_shape": [seq],
         "llm": True,
-        "vocab_size": int(config.vocab_size),
-        "hf_model": hf_id,
+        "vocab_size": vocab,
+        "hf_model": source_id,
     }
-    graph.meta["source"] = f"HuggingFace `{hf_id}` via torch.fx"
+    graph.meta["source"] = f"`{source_id}` via torch.fx (make_fx)"
 
     tensors = {}
     for node in traced.graph.nodes:
@@ -140,8 +156,8 @@ def import_hf_graph(model_key, seq=None, batch=1):
     info.update(
         {
             "pass": "hf_import",
-            "model": hf_id,
-            "label": label,
+            "model": source_id,
+            "label": label or name,
             "torch.fx nodes": len(list(traced.graph.nodes)),
             "parameters": int(sum(t.size for t in tensors.values())),
         }
