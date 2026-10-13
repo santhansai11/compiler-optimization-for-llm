@@ -1,11 +1,23 @@
-"""Simulated hardware cost model.
+"""Per-operator GPU cost model (calibrated on a real GPU).
 
-The project runs without a real accelerator, so modeled GPU numbers come
-from a deterministic per-operator cost table (datacenter-class GPU style).
-Every operator node surviving into the final graph costs one kernel launch.
-Measured (NumPy) numbers live in ``utils.executor`` and are reported
-alongside the modeled ones.
+By default the per-op latencies come from ``docs/results/cost_calibration.json``
+- fitted to kernel times measured on a real GPU by
+``benchmarks/calibrate_cost_model.py`` (validated out-of-sample: 0.995 log
+correlation with measured latency on held-out architectures). Set the
+environment variable ``COST_MODEL=legacy`` (or delete the file) to use the
+original hand-written table, which over-predicted speedups ~2x.
+
+Without a calibration file / with ``legacy`` the project runs without any
+accelerator on the hand-written numbers. Measured (NumPy / torch) numbers
+live in ``utils.executor`` / ``utils.torch_executor``.
 """
+
+import json
+import os
+from pathlib import Path
+
+CALIBRATION_PATH = (Path(__file__).resolve().parent.parent
+                    / "docs" / "results" / "cost_calibration.json")
 
 LAUNCH_OVERHEAD_US = 12.0
 
@@ -85,6 +97,39 @@ DEFAULT_LATENCY_US = 150.0
 DEFAULT_MEMORY_MB = 40.0
 
 
+LEGACY_OP_LATENCY_US = dict(OP_LATENCY_US)
+LEGACY_LAUNCH_OVERHEAD_US = LAUNCH_OVERHEAD_US
+CALIBRATED = False
+
+
+def _apply_calibration():
+    """Replace the hand-written latencies by the GPU-fitted table."""
+    global OP_LATENCY_US, LAUNCH_OVERHEAD_US, DEFAULT_LATENCY_US, CALIBRATED
+    if os.environ.get("COST_MODEL", "").lower() == "legacy" \
+            or not CALIBRATION_PATH.exists():
+        return
+    cal = json.loads(CALIBRATION_PATH.read_text())
+    table = dict(cal["op_latency_us"])
+    elem = sorted(table[k] for k in ("Add", "Scale", "GELU", "Softmax") if k in table)
+    elem_us = elem[len(elem) // 2] if elem else 35.0
+    softmax = table.get("Softmax", elem_us)
+    derived = {
+        "Input": 0.0, "Constant": 0.0, "Identity": 0.0,
+        "Reshape": 2.0, "Cast": 2.0, "Broadcast": 2.0, "Slice": 2.0,
+        "Transpose": elem_us, "Gather": elem_us, "MaskedFill": elem_us,
+        "Tanh": elem_us, "Pow": elem_us, "Sub": table.get("Add", elem_us),
+        "Mul": table.get("Add", elem_us), "FusedScaleSoftmax": softmax,
+    }
+    for op, value in derived.items():
+        table.setdefault(op, value)
+    table["Identity"] = 0.0  # a pass-through launches no kernel
+    OP_LATENCY_US = table
+    DEFAULT_LATENCY_US = elem_us
+    # measured per-op times already include launch overhead
+    LAUNCH_OVERHEAD_US = 0.0
+    CALIBRATED = True
+
+
 def get_op_latency(op_type):
     return OP_LATENCY_US.get(op_type, DEFAULT_LATENCY_US)
 
@@ -153,7 +198,7 @@ def live_range_peak_memory_mb(graph):
 # ----------------------------------------------------------------------
 # Assumed cost of moving one tensor between devices (link latency + a
 # small activation). This is a modeling assumption, not a measurement.
-COMM_US = 150.0
+COMM_US = 50.0  # ASSUMPTION: cross-device tensor transfer (no multi-GPU measured)
 
 
 def deployment_latency_us(graph):
@@ -181,3 +226,8 @@ def deployment_latency_us(graph):
             + LAUNCH_OVERHEAD_US
         free[d] = finish[node]
     return max(finish.values(), default=0.0)
+
+
+_apply_calibration()
+if CALIBRATED:
+    pass  # COMM_US stays an assumption; op latencies are measured

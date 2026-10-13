@@ -129,7 +129,7 @@ def _stage_table(graph, flags, num_partitions, hypergraph, mode=None):
         g, _, _ = _run(graph, enabled, num_partitions, hypergraph, mode)
         rows.append({"stage": f"+ {label}", "ops": g.node_count(),
                      "launches": kernel_launches(g),
-                     "modeled_latency_us": scheduled_latency_us(g)})
+                     "modeled_latency_us": deployment_latency_us(g)})
     return rows
 
 

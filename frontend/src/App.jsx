@@ -294,10 +294,8 @@ function App() {
 
   const passRows = Object.entries(metrics?.pass_durations_s || {}).map(([label, value]) => ({ label: label.replaceAll('_', ' '), value: value * 1000, detail: `${(value * 1000).toFixed(2)} ms` }))
   const memoryRows = metrics ? [
-    { label: 'Measured · original', value: metrics.peak_memory_mb.original, detail: 'NumPy reference executor' },
-    { label: 'Measured · optimized', value: metrics.peak_memory_mb.optimized, tone: 'tone-purple', detail: 'NumPy reference executor' },
-    { label: 'Modeled GPU · original', value: metrics.modeled.memory_original_mb, tone: 'tone-cyan', detail: 'Cost model estimate' },
-    { label: 'Modeled GPU · optimized', value: metrics.modeled.memory_optimized_mb, tone: 'tone-green', detail: 'Cost model estimate' },
+    { label: 'Original graph', value: metrics.peak_memory_mb.original, detail: 'peak of simultaneously live tensors' },
+    { label: 'Optimized graph', value: metrics.peak_memory_mb.optimized, tone: 'tone-purple', detail: 'NumPy reference executor' },
   ] : []
 
   return (
@@ -347,8 +345,8 @@ function App() {
             <div className="metrics-grid">
               <MetricCard label="Inference latency" value={`${metrics.latency_ms.optimized.toFixed(3)} ms`} foot={`was ${metrics.latency_ms.original.toFixed(3)} ms · measured`} icon={Gauge} />
               <MetricCard label="Throughput" value={`${Math.round(metrics.throughput.optimized).toLocaleString()} /s`} foot={`was ${Math.round(metrics.throughput.original).toLocaleString()} samples/s`} icon={Activity} tone="purple" />
-              <MetricCard label="Speedup" value={`${speedup.toFixed(2)}×`} foot={`measured · ${metrics.modeled.speedup.toFixed(2)}× modeled GPU`} icon={ArrowUpRight} tone="cyan" />
-              <MetricCard label="Peak GPU memory" value={`${metrics.modeled.memory_optimized_mb.toFixed(0)} MB`} foot={`was ${metrics.modeled.memory_original_mb.toFixed(0)} MB · modeled`} icon={Boxes} tone="amber" />
+              <MetricCard label="Speedup" value={`${speedup.toFixed(2)}×`} foot={`measured · ${metrics.modeled.speedup.toFixed(2)}× modeled (GPU-calibrated)`} icon={ArrowUpRight} tone="cyan" />
+              <MetricCard label="Peak tensor memory" value={`${metrics.peak_memory_mb.optimized.toFixed(2)} MB`} foot={`was ${metrics.peak_memory_mb.original.toFixed(2)} MB · measured live tensors`} icon={Boxes} tone="amber" />
               <MetricCard label="Graph reduction · GRR" value={`${(metrics.graph_reduction_ratio * 100).toFixed(1)}%`} foot={`${counts.nodes_original} → ${counts.nodes_optimized} nodes`} icon={GitBranch} />
               <MetricCard label="Accuracy preserved" value={metrics.accuracy.preserved ? '100%' : 'Mismatch'} foot={`max error ${metrics.accuracy.max_abs_diff.toExponential(1)}`} icon={Check} tone={metrics.accuracy.preserved ? 'green' : 'amber'} />
               <MetricCard label="Operator merge · OMR" value={`${(metrics.operator_merge_ratio * 100).toFixed(1)}%`} foot="nodes removed by merging" icon={Layers3} tone="purple" />
@@ -356,20 +354,20 @@ function App() {
               <MetricCard label="Kernel launch reduction" value={`${(metrics.kernel_launch_reduction * 100).toFixed(1)}%`} foot={`${counts.kernel_launches_original} → ${counts.kernel_launches_optimized} launches`} icon={Zap} tone="green" />
               <MetricCard label="Compilation time" value={`${(metrics.compilation_time_s * 1000).toFixed(1)} ms`} foot={`${Object.keys(metrics.pass_durations_s || {}).length} stages`} icon={Cpu} />
             </div>
-            {result.deployment && <div className="metric-note"><Braces size={15} /> Two modeled speedups, two assumptions: <b>{metrics.modeled.speedup.toFixed(2)}×</b> (cards above) lets independent kernels overlap on one GPU (DAGS); <b>{(result.deployment.original_us / result.deployment.optimized_us).toFixed(2)}×</b> runs one kernel stream per device with transfer costs ({result.deployment.devices} device{result.deployment.devices > 1 ? 's' : ''}) — the learned optimizer's reward uses this one. Neither is a GPU measurement.</div>}
+            <div className="metric-note"><Braces size={15} /> <b>Modeled speedup {metrics.modeled.speedup.toFixed(2)}×</b> uses per-op times calibrated on a real GPU (one kernel stream per device{result.deployment?.devices > 1 ? `, ${result.deployment.devices} devices` : ''}). DAGS could overlap independent kernels for up to <b>{metrics.modeled.parallel_overlap_speedup_upper_bound.toFixed(2)}×</b>, but kernels do not overlap on a single stream, so that is an upper bound, not a claim. Real-GPU measurements are in the Real GPU tab.</div>
             <div className="charts-grid">
               <Panel title="Graph size through the pipeline" eyebrow="NORMALIZATION + FUSION" icon={GitBranch}><BarChart rows={graphSteps.map((step, index) => ({ label: step.stage, value: step.ops, tone: index === graphSteps.length - 1 ? 'tone-purple' : '', detail: `${step.ops} operations` }))} unit=" ops" precision={0} /></Panel>
               <Panel title="Latency comparison" eyebrow="REFERENCE EXECUTOR · MS" icon={Gauge}><BarChart rows={[
                 { label: 'Original graph', value: metrics.latency_ms.original, detail: 'NumPy interpreter' },
                 { label: 'Optimized graph', value: metrics.latency_ms.optimized, tone: 'tone-purple', detail: `${speedup.toFixed(2)}× measured speedup` },
-                { label: 'Modeled GPU · original', value: metrics.modeled.latency_original_us / 1000, tone: 'tone-cyan', detail: 'Cost model only' },
-                { label: 'Modeled GPU · optimized', value: metrics.modeled.latency_optimized_us / 1000, tone: 'tone-green', detail: `${metrics.modeled.speedup.toFixed(2)}× modeled` },
+                { label: 'Modeled · original', value: metrics.modeled.latency_original_us / 1000, tone: 'tone-cyan', detail: 'GPU-calibrated per-op model' },
+                { label: 'Modeled · optimized', value: metrics.modeled.latency_optimized_us / 1000, tone: 'tone-green', detail: `${metrics.modeled.speedup.toFixed(2)}× modeled` },
               ]} unit=" ms" /></Panel>
               <Panel title="Throughput" eyebrow="SAMPLES PER SECOND" icon={Activity}><BarChart rows={[
                 { label: 'Original graph', value: metrics.throughput.original, detail: `batch ${metrics.throughput.batch}` },
                 { label: 'Optimized graph', value: metrics.throughput.optimized, tone: 'tone-purple', detail: `${((metrics.throughput.optimized / metrics.throughput.original - 1) * 100).toFixed(1)}% change` },
               ]} unit=" /s" precision={0} /></Panel>
-              <Panel title="Memory footprint" eyebrow="MEASURED VS MODELED · MB" icon={Boxes}><BarChart rows={memoryRows} unit=" MB" /></Panel>
+              <Panel title="Memory footprint" eyebrow="MEASURED · LIVE TENSORS · MB" icon={Boxes}><BarChart rows={memoryRows} unit=" MB" /></Panel>
               <Panel title="Optimization ratios" eyebrow="STRUCTURAL METRICS" icon={ChartNoAxesColumn}><BarChart rows={[
                 { label: 'Graph reduction · GRR', value: metrics.graph_reduction_ratio * 100, detail: `${counts.nodes_original - counts.nodes_optimized} nodes removed` },
                 { label: 'Operator merge · OMR', value: metrics.operator_merge_ratio * 100, tone: 'tone-purple' },

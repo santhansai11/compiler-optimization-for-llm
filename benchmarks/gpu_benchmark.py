@@ -27,7 +27,8 @@ from models.architectures import (  # noqa: E402
     create_postln_transformer_graph, create_preln_transformer_graph,
     create_relu_transformer_graph)
 from pipeline import run_pipeline  # noqa: E402
-from utils.cost_model import scheduled_latency_us, sequential_latency_us  # noqa: E402
+from utils.cost_model import (CALIBRATED, LEGACY_OP_LATENCY_US,  # noqa: E402
+                              deployment_latency_us, sequential_latency_us)
 from utils.executor import execute  # noqa: E402
 from utils.torch_executor import device_name, gpu_compare, pick_device  # noqa: E402
 
@@ -71,7 +72,13 @@ def run(device, repeats, warmup, workloads, names):
                 "dispatch_reduction_sdpa": 1 - o["kernel_dispatches"] / a["kernel_dispatches"],
                 "max_rel_error_vs_original": rel,
                 "outputs_match": rel < 1e-3,
-                "modeled_speedup": sequential_latency_us(g) / scheduled_latency_us(opt),
+                "modeled_speedup": sequential_latency_us(g) / deployment_latency_us(opt),
+                "modeled_speedup_legacy_table": (
+                    sum(LEGACY_OP_LATENCY_US.get(d["op_type"], 150.0) + 12.0
+                        for _, d in g.graph.nodes(data=True))
+                    / sum(LEGACY_OP_LATENCY_US.get(d["op_type"], 150.0) + 12.0
+                          for _, d in opt.graph.nodes(data=True))),
+                "cost_model_calibrated": CALIBRATED,
                 "compile_ms": ctime * 1e3,
             }
             if a["allocator_peak_bytes"] is not None:
@@ -118,6 +125,9 @@ def main():
             "min_speedup_auto": float(min(r["speedup_auto"] for r in rows)),
             "max_speedup_auto": float(max(r["speedup_auto"] for r in rows)),
             "median_modeled_speedup": float(np.median([r["modeled_speedup"] for r in rows])),
+            "median_modeled_speedup_legacy_table": float(np.median([r["modeled_speedup_legacy_table"] for r in rows])),
+            "speedup_mae_calibrated": float(np.mean([abs(r["modeled_speedup"] - r["speedup_auto"]) for r in rows])),
+            "speedup_mae_legacy_table": float(np.mean([abs(r["modeled_speedup_legacy_table"] - r["speedup_auto"]) for r in rows])),
             "mean_dispatch_reduction_sdpa": float(np.mean([r["dispatch_reduction_sdpa"] for r in rows])),
         },
     }

@@ -3,6 +3,8 @@
 import numpy as np
 
 from utils.cost_model import (
+    CALIBRATED,
+    deployment_latency_us,
     kernel_launches,
     live_range_peak_memory_mb,
     naive_peak_memory_mb,
@@ -93,12 +95,21 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
         else max(0.0, 100.0 - min(99.0, max_abs_diff * 1e3))
     )
 
-    # ---- Modeled (GPU-style cost model) ----
+    # ---- Modeled (per-op GPU cost model; calibrated on a real GPU) ----
+    # Primary modeled speedup: one kernel stream per device (what the real
+    # GPU measurements show). DAGS overlap is reported separately as an
+    # upper bound, because kernels do not actually overlap on one stream.
     modeled_latency_original_us = sequential_latency_us(original_graph)
-    modeled_latency_optimized_us = scheduled_latency_us(optimized_graph)
+    modeled_latency_optimized_us = deployment_latency_us(optimized_graph)
     modeled_speedup = (
         modeled_latency_original_us / modeled_latency_optimized_us
         if modeled_latency_optimized_us
+        else 1.0
+    )
+    overlap_latency_us = scheduled_latency_us(optimized_graph)
+    parallel_potential = (
+        modeled_latency_original_us / overlap_latency_us
+        if overlap_latency_us
         else 1.0
     )
     modeled_mem_original = naive_peak_memory_mb(original_graph)
@@ -158,6 +169,8 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
             "latency_original_us": modeled_latency_original_us,
             "latency_optimized_us": modeled_latency_optimized_us,
             "speedup": modeled_speedup,
+            "calibrated": CALIBRATED,
+            "parallel_overlap_speedup_upper_bound": parallel_potential,
             "memory_original_mb": modeled_mem_original,
             "memory_optimized_mb": modeled_mem_optimized,
             "memory_reduction_pct": (

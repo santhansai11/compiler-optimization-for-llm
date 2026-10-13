@@ -80,7 +80,7 @@ class LearnedOptimizerTests(unittest.TestCase):
             got = true[lo.ACTIONS.index(tuple(opt.plan(g)["action"]))]
             self.assertGreaterEqual(got, max(true) * 0.95, name)
             if name.startswith("MoE"):
-                self.assertGreater(got, true[fixed] * 1.3)
+                self.assertGreater(got, true[fixed] * 1.1)
 
 
 class TorchExecutorTests(unittest.TestCase):

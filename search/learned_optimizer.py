@@ -133,8 +133,10 @@ def evaluate_actions(graph):
 def build_dataset(per_family=100, seed=0, use_cache=True):
     if use_cache and CACHE_PATH.exists():
         data = pickle.loads(CACHE_PATH.read_bytes())
+        from utils.cost_model import CALIBRATED
         if (data["per_family"] == per_family and data["seed"] == seed
-                and data.get("version") == FEATURE_VERSION):
+                and data.get("version") == FEATURE_VERSION
+                and data.get("calibrated") == CALIBRATED):
             return data["samples"]
     rng = np.random.default_rng(seed)
     samples = []
@@ -148,6 +150,7 @@ def build_dataset(per_family=100, seed=0, use_cache=True):
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     CACHE_PATH.write_bytes(pickle.dumps({"per_family": per_family, "seed": seed,
                                          "version": FEATURE_VERSION,
+                                         "calibrated": __import__("utils.cost_model", fromlist=["x"]).CALIBRATED,
                                          "samples": samples}))
     return samples
 
@@ -163,7 +166,7 @@ def _op_vocab():
 OPS = _op_vocab()
 NODE_DIM = len(OPS) + 4
 GLOBAL_DIM = 8
-FEATURE_VERSION = 2
+FEATURE_VERSION = 3  # bump when features OR the cost model change
 
 
 def featurize(graph):
@@ -184,7 +187,7 @@ def featurize(graph):
         x[index[n], OPS.index(op) if op in OPS else len(OPS) - 1] = 1.0
         x[index[n], len(OPS)] = min(g.in_degree(n), 8) / 8
         x[index[n], len(OPS) + 1] = min(g.out_degree(n), 8) / 8
-        x[index[n], len(OPS) + 2] = get_op_latency(op) / 1000.0
+        x[index[n], len(OPS) + 2] = get_op_latency(op) / 150.0
         x[index[n], len(OPS) + 3] = level[n] / max(1, depth - 1)
     edges = np.array([(index[u], index[v]) for u, v in g.edges()], dtype=np.int64)
     lat = {n: get_op_latency(g.nodes[n].get("op_type")) + 12.0 for n in nodes}
