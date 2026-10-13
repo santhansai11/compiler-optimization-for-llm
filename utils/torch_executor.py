@@ -338,3 +338,18 @@ def gpu_compare(specs, device, repeats=50, warmup=10):
             "output": _main(r.graph, outs).float().cpu().numpy(),
         })
     return result
+
+
+def time_graph(graph, device, attention="sdpa", repeats=15, warmup=3):
+    """Synchronised min-of-N latency (seconds) of a single graph."""
+    runner = _Runner(graph, device, _feed(graph), attention=attention)
+    for _ in range(warmup):
+        runner.run()
+    best = float("inf")
+    for _ in range(repeats):
+        sync(device)
+        t0 = time.perf_counter()
+        runner.run()
+        sync(device)
+        best = min(best, time.perf_counter() - t0)
+    return best

@@ -89,6 +89,7 @@ for _id, (_name, _builder, _desc) in OPERATION_DEMOS.items():
     MODEL_REGISTRY[_id] = (_name, (lambda f: lambda b, s, d: f(b, s, d))(_builder), _desc)
 
 _LEARNED = None
+_RL = None
 DEFAULT_PASSES = {"normalize": True, "canonicalize": True, "merge": True,
                   "schedule": True, "partition": False}
 STAGE_ORDER = [
@@ -232,6 +233,23 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             for f in sorted((PROJECT_ROOT / "docs" / "results").glob("gpu_*.json")):
                 runs.append({"file": f.name, **json.loads(f.read_text())})
             self._send_json({"runs": runs})
+        elif path == "/api/research_results":
+            names = ["real_graph_study", "cost_calibration", "rl_results", "neuro_symbolic_results",
+                     "compiler_comparison", "lm_full_eval", "learned_results", "lm_results"]
+            out = {}
+            for name in names:
+                f = PROJECT_ROOT / "docs" / "results" / f"{name}.json"
+                if f.exists():
+                    data = json.loads(f.read_text())
+                    if name == "neuro_symbolic_results":
+                        data.pop("cases", None)  # keep the payload small
+                    if name == "cost_calibration":
+                        data = {k: data[k] for k in data if k in (
+                            "device_name", "validation_held_out_architectures",
+                            "in_sample_train_architectures", "train_architectures", "sizes",
+                            "timestamp")}
+                    out[name] = data
+            self._send_json(out)
         elif path == "/api/models":
             models = []
             for model_id, (name, builder, desc) in MODEL_REGISTRY.items():
@@ -266,6 +284,8 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             self.handle_architecture_comparison(data)
         elif path == "/api/learned":
             self.handle_learned(data)
+        elif path == "/api/neuro_symbolic":
+            self.handle_neuro_symbolic(data)
         elif path == "/api/ablation":
             self.handle_ablation(data)
         elif path == "/api/export_report":
@@ -344,6 +364,19 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
         best = max(range(len(true)), key=lambda i: true[i])
         order = sorted(range(len(true)), key=lambda i: -plan["predicted"][i])[:6]
         flags, k = lo.action_flags(plan["action"])
+        rl_info = None
+        from search import rl_policy as rlp
+        if rlp.WEIGHTS.exists():
+            global _RL
+            if _RL is None:
+                _RL = rlp.RLPolicy.load()
+            final_g, actions = _RL.plan(graph)
+            n_pass = sum(a in rlp.PASSES for a in actions)
+            devices = final_g.meta.get("partition", {}).get("partitions", 1) if any(a.startswith("place") for a in actions) else 1
+            from utils.cost_model import deployment_latency_us
+            base = deployment_latency_us(graph)
+            rl_info = {"actions": actions, "devices": devices,
+                       "true_reward": rlp._reward(base, final_g, n_pass, devices)}
         results = lo.RESULTS_PATH.read_text() if lo.RESULTS_PATH.exists() else "{}"
         self._send_json({
             "model_id": model_id,
@@ -354,8 +387,28 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             "oracle": {"label": lo.action_label(lo.ACTIONS[best]), "true_reward": true[best]},
             "top_predicted": [{"label": lo.action_label(lo.ACTIONS[i]),
                                "predicted": plan["predicted"][i], "true": true[i]} for i in order],
+            "rl_policy": rl_info,
             "training": json.loads(results),
             "reward_definition": f"deployment speedup − {lo.DEVICE_PENALTY}·(devices−1) − {lo.PASS_PENALTY}·(#passes); modeled, not measured",
+        })
+
+    def handle_neuro_symbolic(self, data):
+        """Latency-GNN-guided rewrite search on the selected model."""
+        from search import neuro_symbolic as nsm
+
+        graph = self._get_model_graph(data.get("model_id", "postln_2b"), int(data.get("batch", 4)),
+                                      int(data.get("seq", 32)), int(data.get("d_model", 64)))
+        result, info = nsm.neuro_symbolic_search(graph)
+        fixed, _, _ = run_pipeline(graph, partition=False)
+        metrics = compute_metrics(graph, result, {}, info["duration_s"], batch_size=int(data.get("batch", 4)))
+        self._send_json({
+            "guidance": info["guidance"], "rewrites_applied": info["applied"],
+            "nodes": {"original": graph.node_count(), "neuro_symbolic": result.node_count(),
+                      "fixed_pipeline": fixed.node_count()},
+            "accuracy_preserved": metrics["accuracy"]["preserved"],
+            "max_abs_diff": metrics["accuracy"]["max_abs_diff"],
+            "search_seconds": info["duration_s"], "gpu_measurements_used": 0,
+            "optimized_graph": graph_to_d3(result),
         })
 
     def handle_ablation(self, data):

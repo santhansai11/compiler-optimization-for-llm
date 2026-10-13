@@ -1,89 +1,175 @@
-"""Neuro-symbolic rewrite search: symbolic rules + hybrid learned guidance.
+"""Neuro-symbolic rewrite search.
 
-Each round enumerates every applicable symbolic rewrite, scores each
-candidate result with a hybrid objective - the deterministic cost model
-(ground truth) blended with the learned GNN surrogate (fast guidance) -
-minus a small node-count penalty, and greedily applies the best-scoring
-rewrite until no candidate improves the score. This mirrors real learned
-compilers: the model proposes and ranks, the cost model validates.
+SYMBOLIC part  - ``search.rewrites``: every legal single rewrite (identity /
+                 constant folding, scale merging, CSE, transpose algebra,
+                 operator fusion, attention fusion, dead code). Any sequence
+                 of them preserves the model's outputs by construction.
+NEURAL part    - ``LatencyGNN``: a graph neural network trained on latencies
+                 MEASURED on a real GPU, predicting log(latency) of any
+                 (partially optimised) graph at a given tensor size.
+
+Search: from the current graph, enumerate all legal rewrites, score each
+resulting graph with the network (no GPU needed at search time), apply the
+best one if it is predicted faster (or equally fast and smaller), repeat.
+The network is what decides e.g. that fusing attention into the fused kernel
+is NOT worth it at sizes where that kernel is slower on this GPU.
+
+    python benchmarks/neuro_symbolic_study.py     # data + LOFO + final model
 """
 
+import math
 import time
+from pathlib import Path
 
-from search.gnn_torch import load_or_train
-from search.rewrites import RULES
-from utils.cost_model import sequential_latency_us
+import numpy as np
+import torch
+from torch import nn
 
-COST_WEIGHT = 0.7
-GNN_WEIGHT = 0.3
-NODE_PENALTY = 0.01
+from search import learned_optimizer as lo
+from search.rewrites import RULES, apply_rewrite, enumerate_rewrites
 
-
-def _score_candidate(candidate, base_cost, scorer):
-    """Hybrid objective: cost-model ratio + GNN prediction - size penalty."""
-    trial_cost = sequential_latency_us(candidate)
-    modeled_ratio = base_cost / trial_cost if trial_cost else 1.0
-    return (
-        COST_WEIGHT * modeled_ratio
-        + GNN_WEIGHT * scorer.score_graph(candidate)
-        - NODE_PENALTY * candidate.node_count()
-    )
+WEIGHTS = Path(__file__).with_name("ns_value.pt")
+SIZE_DIM = 5
+GLOBAL_DIM = lo.GLOBAL_DIM + SIZE_DIM
 
 
-def neuro_symbolic_search(graph, max_iterations=25, scorer=None):
-    """Greedy rewrite search over symbolic rules with hybrid guidance.
+# ------------------------------------------------------------------ features
+def featurize_sized(graph):
+    """Graph features + tensor-size features (batch, seq, d_model, work prior)."""
+    from utils.cost_model import get_op_latency
 
-    Returns ``(graph, info)`` with the rewritten graph and a log of the
-    applied rules and their scores.
+    x, edges, glob = lo.featurize(graph)
+    cfg = graph.meta.get("config") or {}
+    b, s, d = (int(cfg.get("batch", 4)), int(cfg.get("seq", 32)), int(cfg.get("d_model", 64)))
+    prior = sum(get_op_latency(dd.get("op_type")) for _, dd in graph.graph.nodes(data=True))
+    size = np.array([math.log(b) / 3, math.log(s) / 6, math.log(d) / 6,
+                     math.log(b * s * d) / 14, math.log1p(prior) / 8], dtype=np.float32)
+    return x, edges, np.concatenate([glob, size])
+
+
+class LatencyGNN(nn.Module):
+    """Additive learned cost model (as in learned compiler cost models).
+
+    Every operation gets a context-aware predicted time ``softplus(MLP)``
+    (own features + tensor-size features + 2 rounds of forward/backward
+    message passing); the graph latency is the SUM, so the model generalises
+    across architectures that reuse the same operations. Output: log(us).
+    """
+
+    def __init__(self, hidden=64, layers=2):
+        super().__init__()
+        self.inp = nn.Linear(lo.NODE_DIM + GLOBAL_DIM, hidden)
+        self.fwd = nn.ModuleList(nn.Linear(2 * hidden, hidden) for _ in range(layers))
+        self.bwd = nn.ModuleList(nn.Linear(2 * hidden, hidden) for _ in range(layers))
+        self.node_time = nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 1))
+        self.log_scale = nn.Parameter(torch.tensor(0.0))
+        self.register_buffer("mu", torch.zeros(()))     # kept for a uniform API
+        self.register_buffer("sigma", torch.ones(()))
+
+    def forward(self, x, src, dst, batch, glob):
+        h = torch.relu(self.inp(torch.cat([x, glob[batch]], -1)))
+        agg = lo.PlanGNN._mean_agg
+        for f, b in zip(self.fwd, self.bwd):
+            h = h + torch.relu(f(torch.cat([h, agg(h, src, dst)], -1))) \
+                  + torch.relu(b(torch.cat([h, agg(h, dst, src)], -1)))
+        t = nn.functional.softplus(self.node_time(h)).squeeze(-1)
+        total = torch.zeros(glob.shape[0]).index_add_(0, batch, t)
+        return torch.log(total + 1e-6) + self.log_scale
+
+    def predict_log_us(self, feats):
+        with torch.no_grad():
+            return self(*lo.collate(feats)).numpy()
+
+
+def fit_value(samples, epochs=400, seed=0, lr=4e-3):
+    """samples: [{'features': featurize_sized(...), 'log_us': float}]."""
+    torch.manual_seed(seed)
+    model = LatencyGNN()
+    y = torch.tensor([s["log_us"] for s in samples], dtype=torch.float32)
+    with torch.no_grad():
+        model.log_scale.fill_(float(y.mean()) - 2.0)
+    batch = lo.collate([s["features"] for s in samples])
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-6)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, epochs)
+    for _ in range(epochs):
+        opt.zero_grad()
+        loss = nn.functional.smooth_l1_loss(model(*batch), y, beta=0.1)
+        loss.backward()
+        opt.step()
+        sched.step()
+    model.eval()
+    return model, float(loss.item())
+
+
+# -------------------------------------------------------------------- search
+def guided_search(graph, score_fn, max_steps=80, tol=0.003):
+    """Greedy neuro-symbolic search.
+
+    ``score_fn(list_of_graphs) -> predicted log-latency`` (lower is better).
+    Accept the best candidate if it is predicted faster, or predicted within
+    ``tol`` (relative, in log units) AND strictly smaller. Returns
+    ``(graph, trace)``.
+    """
+    cur = graph
+    cur_score = float(score_fn([cur])[0])
+    trace = []
+    for _ in range(max_steps):
+        cands = []
+        for rule, match in enumerate_rewrites(cur):
+            new = apply_rewrite(cur, rule, match)
+            if new is not None:
+                cands.append((rule.name, new))
+        if not cands:
+            break
+        scores = np.asarray(score_fn([g for _, g in cands]), dtype=float)
+        order = np.argsort(scores, kind="stable")
+        chosen = None
+        for i in order:
+            better = scores[i] < cur_score - 1e-9
+            tie_smaller = scores[i] <= cur_score + tol and cands[i][1].node_count() < cur.node_count()
+            if better or tie_smaller:
+                chosen = i
+                break
+        if chosen is None:
+            break
+        trace.append({"rule": cands[chosen][0], "predicted_log_us": float(scores[chosen]),
+                      "nodes": cands[chosen][1].node_count()})
+        cur, cur_score = cands[chosen][1], float(scores[chosen])
+    return cur, trace
+
+
+def table_score(graphs):
+    """No-learning fallback: sum of calibrated per-op latencies (log)."""
+    from utils.cost_model import get_op_latency
+
+    return [math.log(sum(get_op_latency(d.get("op_type")) for _, d in g.graph.nodes(data=True)) + 1.0)
+            for g in graphs]
+
+
+def load_value(path=WEIGHTS):
+    model = LatencyGNN()
+    model.load_state_dict(torch.load(path, map_location="cpu", weights_only=True))
+    model.eval()
+    return model
+
+
+def neuro_symbolic_search(graph, max_iterations=80, model=None):
+    """Pipeline hook: returns ``(optimised graph, info)``.
+
+    Uses the trained latency GNN when ``search/ns_value.pt`` exists, otherwise
+    the calibrated per-op table.
     """
     started = time.perf_counter()
-    scorer = scorer or load_or_train()
-    current = graph.copy()
-    applied = []
-
-    base_cost = sequential_latency_us(graph)
-    initial_score = _score_candidate(current, base_cost, scorer)
-    best_score = initial_score
-
-    for _ in range(max_iterations):
-        candidates = []
-        for rule in RULES:
-            for match in rule.find(current):
-                trial = current.copy()
-                try:
-                    if not rule.apply(trial, match):
-                        continue
-                except Exception:
-                    continue
-                score = _score_candidate(trial, base_cost, scorer)
-                candidates.append((score, rule.name, trial))
-        if not candidates:
-            break
-        candidates.sort(key=lambda item: (-item[0], item[1]))
-        top_score, top_name, top_graph = candidates[0]
-        if top_score <= best_score + 1e-9:
-            break
-        best_score = top_score
-        current = top_graph
-        applied.append({
-            "rule": top_name,
-            "score": float(top_score),
-            "nodes": current.node_count(),
-        })
-
-    info = {
-        "pass": "neuro_symbolic_search",
-        "guidance": (
-            f"hybrid: {COST_WEIGHT:.0%} cost model + {GNN_WEIGHT:.0%} GNN "
-            f"surrogate, node penalty {NODE_PENALTY}"
-        ),
-        "initial_score": float(initial_score),
-        "final_score": float(best_score),
-        "iterations": len(applied),
-        "applied": applied,
-        "rules_available": [rule.name for rule in RULES],
-        "nodes_after": current.node_count(),
-        "duration_s": time.perf_counter() - started,
-    }
-    current.meta["neuro_symbolic_search"] = info
-    return current, info
+    if model is None and WEIGHTS.exists():
+        model = load_value()
+    if model is not None:
+        score = lambda gs: model.predict_log_us([featurize_sized(g) for g in gs])
+        guide = "latency GNN trained on real-GPU measurements"
+    else:
+        score, guide = table_score, "calibrated per-op table (no trained model found)"
+    out, trace = guided_search(graph, score, max_steps=max_iterations)
+    info = {"pass": "neuro_symbolic_search", "guidance": guide, "iterations": len(trace),
+            "applied": trace, "rules_available": [r.name for r in RULES],
+            "nodes_after": out.node_count(), "duration_s": time.perf_counter() - started}
+    out.meta["neuro_symbolic_search"] = info
+    return out, info

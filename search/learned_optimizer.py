@@ -62,7 +62,13 @@ def action_label(action):
 # Dataset generation
 # ----------------------------------------------------------------------
 def _inject_redundancy(graph, rng):
-    """Insert semantics-preserving junk: identities and Scale(a)->Scale(1/a)."""
+    """Insert semantics-preserving junk: identities and Scale(a)->Scale(1/a).
+
+    The junk is spliced into an existing edge WITHOUT changing the operand
+    order of the consumer (operand roles are encoded by in-edge order).
+    """
+    from passes.normalize import _replace_input
+
     g = graph.graph
     for i in range(int(rng.integers(0, 9))):
         edges = [(u, v) for u, v in g.edges()
@@ -70,18 +76,18 @@ def _inject_redundancy(graph, rng):
         if not edges:
             return graph
         u, v = edges[int(rng.integers(len(edges)))]
-        g.remove_edge(u, v)
         if rng.random() < 0.5:
             graph.add_operation(f"inj{i}_id", "Identity")
             graph.add_dependency(u, f"inj{i}_id")
-            graph.add_dependency(f"inj{i}_id", v)
+            last = f"inj{i}_id"
         else:
             a = float(rng.choice([0.5, 2.0, 4.0]))
             graph.add_operation(f"inj{i}_s1", "Scale", factor=a)
             graph.add_operation(f"inj{i}_s2", "Scale", factor=1.0 / a)
             graph.add_dependency(u, f"inj{i}_s1")
             graph.add_dependency(f"inj{i}_s1", f"inj{i}_s2")
-            graph.add_dependency(f"inj{i}_s2", v)
+            last = f"inj{i}_s2"
+        _replace_input(g, v, u, last)
     return graph
 
 

@@ -1,0 +1,976 @@
+{
+ "device": "cpu",
+ "jax": "0.11.2",
+ "jax_backend": "cpu",
+ "torch": "2.14.1",
+ "rows": [
+  {
+   "arch": "Post-LN Transformer",
+   "size": [
+    4,
+    64,
+    64
+   ],
+   "nodes_original": 42,
+   "nodes_ours": 14,
+   "systems": {
+    "eager": {
+     "latency_us": 434.45900018923567,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 414.33300020798924,
+     "compile_ms": 1.0919999999714491,
+     "max_rel_err": 1.1529576937618913e-07
+    },
+    "xla": {
+     "latency_us": 385.2080003525771,
+     "compile_ms": 67.88783299998613,
+     "max_rel_err": 3.1706338177173166e-07
+    },
+    "ours+xla": {
+     "latency_us": 384.9999998237763,
+     "compile_ms": 60.34933399996589,
+     "max_rel_err": 3.1706338177173166e-07
+    },
+    "inductor": {
+     "latency_us": 709.33300003162,
+     "compile_ms": 1297.7902079996966,
+     "max_rel_err": 2.8823941988775914e-07
+    },
+    "ours+inductor": {
+     "latency_us": 637.1250001393491,
+     "compile_ms": 282.97829099983574,
+     "max_rel_err": 2.8823941988775914e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 404,
+     "hlo_fusions": 46
+    },
+    "ours+xla": {
+     "hlo_instructions": 404,
+     "hlo_fusions": 46
+    }
+   }
+  },
+  {
+   "arch": "Post-LN Transformer",
+   "size": [
+    8,
+    256,
+    256
+   ],
+   "nodes_original": 42,
+   "nodes_ours": 14,
+   "systems": {
+    "eager": {
+     "latency_us": 4429.125000115164,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 4633.208000086597,
+     "compile_ms": 0.8134579998113622,
+     "max_rel_err": 2.3314549935093964e-07
+    },
+    "xla": {
+     "latency_us": 7651.666999663576,
+     "compile_ms": 77.61770800016166,
+     "max_rel_err": 5.12920109940751e-07
+    },
+    "ours+xla": {
+     "latency_us": 7667.416000003868,
+     "compile_ms": 67.36758299985013,
+     "max_rel_err": 5.12920109940751e-07
+    },
+    "inductor": {
+     "latency_us": 4666.916000132915,
+     "compile_ms": 3808.555999999953,
+     "max_rel_err": 5.595491643362038e-07
+    },
+    "ours+inductor": {
+     "latency_us": 4620.499999873573,
+     "compile_ms": 1556.3982919998125,
+     "max_rel_err": 5.595491643362038e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 404,
+     "hlo_fusions": 46
+    },
+    "ours+xla": {
+     "hlo_instructions": 404,
+     "hlo_fusions": 46
+    }
+   }
+  },
+  {
+   "arch": "Post-LN Transformer",
+   "size": [
+    4,
+    256,
+    512
+   ],
+   "nodes_original": 42,
+   "nodes_ours": 14,
+   "systems": {
+    "eager": {
+     "latency_us": 6410.125000002154,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 6879.750000280183,
+     "compile_ms": 5.535499999950844,
+     "max_rel_err": 2.928331639395765e-07
+    },
+    "xla": {
+     "latency_us": 11551.666999821464,
+     "compile_ms": 102.55220899989581,
+     "max_rel_err": 7.320829240597959e-07
+    },
+    "ours+xla": {
+     "latency_us": 11525.54100008274,
+     "compile_ms": 96.64237499964656,
+     "max_rel_err": 7.320829240597959e-07
+    },
+    "inductor": {
+     "latency_us": 7007.08400017902,
+     "compile_ms": 3362.9916249997223,
+     "max_rel_err": 9.761105275174486e-07
+    },
+    "ours+inductor": {
+     "latency_us": 6955.291999929614,
+     "compile_ms": 1498.377333999997,
+     "max_rel_err": 9.761105275174486e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 404,
+     "hlo_fusions": 46
+    },
+    "ours+xla": {
+     "hlo_instructions": 404,
+     "hlo_fusions": 46
+    }
+   }
+  },
+  {
+   "arch": "Pre-LN Transformer",
+   "size": [
+    4,
+    64,
+    64
+   ],
+   "nodes_original": 36,
+   "nodes_ours": 16,
+   "systems": {
+    "eager": {
+     "latency_us": 452.95800009625964,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 436.24999989333446,
+     "compile_ms": 0.826292000056128,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 400.29100000538165,
+     "compile_ms": 68.29962500023612,
+     "max_rel_err": 4.2984137849089166e-07
+    },
+    "ours+xla": {
+     "latency_us": 395.1660000893753,
+     "compile_ms": 68.08208399979776,
+     "max_rel_err": 4.2984137849089166e-07
+    },
+    "inductor": {
+     "latency_us": 724.7080002343864,
+     "compile_ms": 3191.9182910000927,
+     "max_rel_err": 4.3712682895602484e-07
+    },
+    "ours+inductor": {
+     "latency_us": 717.6660001277924,
+     "compile_ms": 1965.6292919999032,
+     "max_rel_err": 4.3712682895602484e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 405,
+     "hlo_fusions": 49
+    },
+    "ours+xla": {
+     "hlo_instructions": 405,
+     "hlo_fusions": 49
+    }
+   }
+  },
+  {
+   "arch": "Pre-LN Transformer",
+   "size": [
+    8,
+    256,
+    256
+   ],
+   "nodes_original": 36,
+   "nodes_ours": 16,
+   "systems": {
+    "eager": {
+     "latency_us": 4587.66600013405,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 4632.582999875012,
+     "compile_ms": 0.7766670000819431,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 8081.999999831169,
+     "compile_ms": 70.16449999991892,
+     "max_rel_err": 4.829742579204321e-07
+    },
+    "ours+xla": {
+     "latency_us": 7992.708000074344,
+     "compile_ms": 68.69191700025112,
+     "max_rel_err": 4.829742579204321e-07
+    },
+    "inductor": {
+     "latency_us": 5010.124999898835,
+     "compile_ms": 3586.2519590000375,
+     "max_rel_err": 5.519705723600055e-07
+    },
+    "ours+inductor": {
+     "latency_us": 4978.708000180632,
+     "compile_ms": 2123.8714579999396,
+     "max_rel_err": 5.519705723600055e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 405,
+     "hlo_fusions": 49
+    },
+    "ours+xla": {
+     "hlo_instructions": 405,
+     "hlo_fusions": 49
+    }
+   }
+  },
+  {
+   "arch": "Pre-LN Transformer",
+   "size": [
+    4,
+    256,
+    512
+   ],
+   "nodes_original": 36,
+   "nodes_ours": 16,
+   "systems": {
+    "eager": {
+     "latency_us": 6152.958999791736,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 6240.042000172252,
+     "compile_ms": 0.7787089998601004,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 10900.374999891937,
+     "compile_ms": 93.81937499983906,
+     "max_rel_err": 8.326813940584543e-07
+    },
+    "ours+xla": {
+     "latency_us": 10967.292000259476,
+     "compile_ms": 91.01354299991726,
+     "max_rel_err": 8.326813940584543e-07
+    },
+    "inductor": {
+     "latency_us": 6682.250000267231,
+     "compile_ms": 3784.5945829999437,
+     "max_rel_err": 7.347188670792093e-07
+    },
+    "ours+inductor": {
+     "latency_us": 6572.333999883995,
+     "compile_ms": 2092.4795010000707,
+     "max_rel_err": 7.347188670792093e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 405,
+     "hlo_fusions": 49
+    },
+    "ours+xla": {
+     "hlo_instructions": 405,
+     "hlo_fusions": 49
+    }
+   }
+  },
+  {
+   "arch": "Post-LN + ReLU",
+   "size": [
+    4,
+    64,
+    64
+   ],
+   "nodes_original": 42,
+   "nodes_ours": 14,
+   "systems": {
+    "eager": {
+     "latency_us": 329.7499997643172,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 309.8749998571293,
+     "compile_ms": 0.983500000074855,
+     "max_rel_err": 8.420900599048764e-08
+    },
+    "xla": {
+     "latency_us": 373.5410000444972,
+     "compile_ms": 56.364208000104554,
+     "max_rel_err": 2.806966676871525e-07
+    },
+    "ours+xla": {
+     "latency_us": 370.91700005476014,
+     "compile_ms": 55.66087500028516,
+     "max_rel_err": 2.806966676871525e-07
+    },
+    "inductor": {
+     "latency_us": 687.792000007903,
+     "compile_ms": 1443.649791000098,
+     "max_rel_err": 2.806966676871525e-07
+    },
+    "ours+inductor": {
+     "latency_us": 625.9159999899566,
+     "compile_ms": 723.8743330003672,
+     "max_rel_err": 2.806966676871525e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 372,
+     "hlo_fusions": 46
+    },
+    "ours+xla": {
+     "hlo_instructions": 372,
+     "hlo_fusions": 46
+    }
+   }
+  },
+  {
+   "arch": "Post-LN + ReLU",
+   "size": [
+    8,
+    256,
+    256
+   ],
+   "nodes_original": 42,
+   "nodes_ours": 14,
+   "systems": {
+    "eager": {
+     "latency_us": 3882.2919996164273,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 3901.2499996715633,
+     "compile_ms": 0.8505830001013237,
+     "max_rel_err": 1.844798731553965e-07
+    },
+    "xla": {
+     "latency_us": 7360.749999861582,
+     "compile_ms": 71.11462500006382,
+     "max_rel_err": 5.30379622887267e-07
+    },
+    "ours+xla": {
+     "latency_us": 7558.000000244647,
+     "compile_ms": 65.54845800019393,
+     "max_rel_err": 5.30379622887267e-07
+    },
+    "inductor": {
+     "latency_us": 4108.375000214437,
+     "compile_ms": 1481.897540999853,
+     "max_rel_err": 5.073196689409087e-07
+    },
+    "ours+inductor": {
+     "latency_us": 4019.500000140397,
+     "compile_ms": 777.4227079999037,
+     "max_rel_err": 5.534396336770442e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 372,
+     "hlo_fusions": 46
+    },
+    "ours+xla": {
+     "hlo_instructions": 372,
+     "hlo_fusions": 46
+    }
+   }
+  },
+  {
+   "arch": "Post-LN + ReLU",
+   "size": [
+    4,
+    256,
+    512
+   ],
+   "nodes_original": 42,
+   "nodes_ours": 14,
+   "systems": {
+    "eager": {
+     "latency_us": 5813.291999857029,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 5693.416999747569,
+     "compile_ms": 0.9228330000041751,
+     "max_rel_err": 2.958154823318182e-07
+    },
+    "xla": {
+     "latency_us": 10930.333000032988,
+     "compile_ms": 92.88245799962169,
+     "max_rel_err": 6.902361064931029e-07
+    },
+    "ours+xla": {
+     "latency_us": 10979.166999732115,
+     "compile_ms": 83.79391600010422,
+     "max_rel_err": 6.902361064931029e-07
+    },
+    "inductor": {
+     "latency_us": 5904.7919999102305,
+     "compile_ms": 709.9401659997966,
+     "max_rel_err": 6.902361064931029e-07
+    },
+    "ours+inductor": {
+     "latency_us": 6021.291999786627,
+     "compile_ms": 621.4658750000126,
+     "max_rel_err": 7.395387342512549e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 372,
+     "hlo_fusions": 46
+    },
+    "ours+xla": {
+     "hlo_instructions": 372,
+     "hlo_fusions": 46
+    }
+   }
+  },
+  {
+   "arch": "LLaMA-style",
+   "size": [
+    4,
+    64,
+    64
+   ],
+   "nodes_original": 37,
+   "nodes_ours": 22,
+   "systems": {
+    "eager": {
+     "latency_us": 347.5830003480951,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 343.6249999140273,
+     "compile_ms": 0.7068750001053559,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 475.58400001435075,
+     "compile_ms": 56.76387500034252,
+     "max_rel_err": 3.435162625464727e-07
+    },
+    "ours+xla": {
+     "latency_us": 470.54100014065625,
+     "compile_ms": 58.299290999912046,
+     "max_rel_err": 3.435162625464727e-07
+    },
+    "inductor": {
+     "latency_us": 531.7499999364372,
+     "compile_ms": 4582.372249999935,
+     "max_rel_err": 4.00768982444788e-07
+    },
+    "ours+inductor": {
+     "latency_us": 521.125000432221,
+     "compile_ms": 645.9731249997276,
+     "max_rel_err": 4.00768982444788e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 310,
+     "hlo_fusions": 43
+    },
+    "ours+xla": {
+     "hlo_instructions": 310,
+     "hlo_fusions": 43
+    }
+   }
+  },
+  {
+   "arch": "LLaMA-style",
+   "size": [
+    8,
+    256,
+    256
+   ],
+   "nodes_original": 37,
+   "nodes_ours": 22,
+   "systems": {
+    "eager": {
+     "latency_us": 5037.957999775244,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 5189.416000121128,
+     "compile_ms": 0.8443749998150452,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 8995.542000320711,
+     "compile_ms": 71.36674999992465,
+     "max_rel_err": 5.240633527137106e-07
+    },
+    "ours+xla": {
+     "latency_us": 9215.417000177695,
+     "compile_ms": 69.70216699983212,
+     "max_rel_err": 5.240633527137106e-07
+    },
+    "inductor": {
+     "latency_us": 5080.083000393643,
+     "compile_ms": 5066.653374999987,
+     "max_rel_err": 6.114072448326624e-07
+    },
+    "ours+inductor": {
+     "latency_us": 4890.584000349918,
+     "compile_ms": 666.9356659995174,
+     "max_rel_err": 6.114072448326624e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 310,
+     "hlo_fusions": 43
+    },
+    "ours+xla": {
+     "hlo_instructions": 310,
+     "hlo_fusions": 43
+    }
+   }
+  },
+  {
+   "arch": "LLaMA-style",
+   "size": [
+    4,
+    256,
+    512
+   ],
+   "nodes_original": 37,
+   "nodes_ours": 22,
+   "systems": {
+    "eager": {
+     "latency_us": 7401.9160001626005,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 7502.584000121715,
+     "compile_ms": 0.8121249998112035,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 13514.166999812005,
+     "compile_ms": 100.41499999988446,
+     "max_rel_err": 7.917137736512814e-07
+    },
+    "ours+xla": {
+     "latency_us": 13474.124999902415,
+     "compile_ms": 94.77099999958227,
+     "max_rel_err": 7.917137736512814e-07
+    },
+    "inductor": {
+     "latency_us": 7289.582999874256,
+     "compile_ms": 3497.545125000215,
+     "max_rel_err": 8.906779953576915e-07
+    },
+    "ours+inductor": {
+     "latency_us": 7258.624999849417,
+     "compile_ms": 897.8162499997779,
+     "max_rel_err": 8.906779953576915e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 310,
+     "hlo_fusions": 43
+    },
+    "ours+xla": {
+     "hlo_instructions": 310,
+     "hlo_fusions": 43
+    }
+   }
+  },
+  {
+   "arch": "MoE Transformer",
+   "size": [
+    4,
+    64,
+    64
+   ],
+   "nodes_original": 53,
+   "nodes_ours": 32,
+   "systems": {
+    "eager": {
+     "latency_us": 850.5000000695873,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 915.1250001195876,
+     "compile_ms": 1.1162920000060694,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 685.9579998490517,
+     "compile_ms": 73.47316699997464,
+     "max_rel_err": 4.0744828311289893e-07
+    },
+    "ours+xla": {
+     "latency_us": 671.3329999001871,
+     "compile_ms": 71.03866699981154,
+     "max_rel_err": 4.0744828311289893e-07
+    },
+    "inductor": {
+     "latency_us": 1068.0830000637798,
+     "compile_ms": 2115.1471250000213,
+     "max_rel_err": 3.4924138958558615e-07
+    },
+    "ours+inductor": {
+     "latency_us": 1070.374999926571,
+     "compile_ms": 1098.7832499999968,
+     "max_rel_err": 3.4924138958558615e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 609,
+     "hlo_fusions": 67
+    },
+    "ours+xla": {
+     "hlo_instructions": 609,
+     "hlo_fusions": 67
+    }
+   }
+  },
+  {
+   "arch": "MoE Transformer",
+   "size": [
+    8,
+    256,
+    256
+   ],
+   "nodes_original": 53,
+   "nodes_ours": 32,
+   "systems": {
+    "eager": {
+     "latency_us": 9040.16699996646,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 9366.00000022736,
+     "compile_ms": 1.0799579999911657,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 12547.499999982392,
+     "compile_ms": 85.67700000003242,
+     "max_rel_err": 3.9455505884689046e-07
+    },
+    "ours+xla": {
+     "latency_us": 12477.833000048122,
+     "compile_ms": 85.43845799977134,
+     "max_rel_err": 3.9455505884689046e-07
+    },
+    "inductor": {
+     "latency_us": 9202.333000303042,
+     "compile_ms": 2257.3614170000837,
+     "max_rel_err": 4.603142542691785e-07
+    },
+    "ours+inductor": {
+     "latency_us": 9170.374999939668,
+     "compile_ms": 957.5101240002368,
+     "max_rel_err": 4.603142542691785e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 609,
+     "hlo_fusions": 67
+    },
+    "ours+xla": {
+     "hlo_instructions": 609,
+     "hlo_fusions": 67
+    }
+   }
+  },
+  {
+   "arch": "MoE Transformer",
+   "size": [
+    4,
+    256,
+    512
+   ],
+   "nodes_original": 53,
+   "nodes_ours": 32,
+   "systems": {
+    "eager": {
+     "latency_us": 12928.249999731634,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 13122.083999860479,
+     "compile_ms": 1.1549159999049152,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 19858.20900017643,
+     "compile_ms": 150.29774999993606,
+     "max_rel_err": 6.919553925399669e-07
+    },
+    "ours+xla": {
+     "latency_us": 19878.458000221144,
+     "compile_ms": 133.7962080001489,
+     "max_rel_err": 6.919553925399669e-07
+    },
+    "inductor": {
+     "latency_us": 13079.374999961146,
+     "compile_ms": 2823.6203330002354,
+     "max_rel_err": 6.387280677699891e-07
+    },
+    "ours+inductor": {
+     "latency_us": 13147.125000159576,
+     "compile_ms": 964.7627069998634,
+     "max_rel_err": 6.387280677699891e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 609,
+     "hlo_fusions": 67
+    },
+    "ours+xla": {
+     "hlo_instructions": 609,
+     "hlo_fusions": 67
+    }
+   }
+  },
+  {
+   "arch": "Multi-head Transformer",
+   "size": [
+    4,
+    64,
+    64
+   ],
+   "nodes_original": 75,
+   "nodes_ours": 24,
+   "systems": {
+    "eager": {
+     "latency_us": 868.7090003149933,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 864.7499998915009,
+     "compile_ms": 1.2812499999199645,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 999.459000013303,
+     "compile_ms": 83.57729199997266,
+     "max_rel_err": 4.360704508599156e-07
+    },
+    "ours+xla": {
+     "latency_us": 1005.4579997813562,
+     "compile_ms": 80.72391599989714,
+     "max_rel_err": 4.360704508599156e-07
+    },
+    "inductor": {
+     "latency_us": 1050.0000003048626,
+     "compile_ms": 3123.8232499999867,
+     "max_rel_err": 4.98366205192724e-07
+    },
+    "ours+inductor": {
+     "latency_us": 928.8749997722334,
+     "compile_ms": 1406.3320000000203,
+     "max_rel_err": 4.98366205192724e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 693,
+     "hlo_fusions": 85
+    },
+    "ours+xla": {
+     "hlo_instructions": 693,
+     "hlo_fusions": 85
+    }
+   }
+  },
+  {
+   "arch": "Multi-head Transformer",
+   "size": [
+    8,
+    256,
+    256
+   ],
+   "nodes_original": 75,
+   "nodes_ours": 24,
+   "systems": {
+    "eager": {
+     "latency_us": 12854.167000114103,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 11755.583000194747,
+     "compile_ms": 1.2794159997611132,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 18554.208999830735,
+     "compile_ms": 95.6379580002249,
+     "max_rel_err": 7.201643370535749e-07
+    },
+    "ours+xla": {
+     "latency_us": 18531.540999902063,
+     "compile_ms": 102.28304099973684,
+     "max_rel_err": 7.201643370535749e-07
+    },
+    "inductor": {
+     "latency_us": 11623.999999756052,
+     "compile_ms": 2856.629874999726,
+     "max_rel_err": 6.172837174744927e-07
+    },
+    "ours+inductor": {
+     "latency_us": 11573.000000225875,
+     "compile_ms": 1481.085874999735,
+     "max_rel_err": 6.172837174744927e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 693,
+     "hlo_fusions": 85
+    },
+    "ours+xla": {
+     "hlo_instructions": 693,
+     "hlo_fusions": 85
+    }
+   }
+  },
+  {
+   "arch": "Multi-head Transformer",
+   "size": [
+    4,
+    256,
+    512
+   ],
+   "nodes_original": 75,
+   "nodes_ours": 24,
+   "systems": {
+    "eager": {
+     "latency_us": 17374.79199982772,
+     "compile_ms": 0.0,
+     "max_rel_err": 0.0
+    },
+    "ours": {
+     "latency_us": 16463.584000121045,
+     "compile_ms": 1.4840419999018195,
+     "max_rel_err": 0.0
+    },
+    "xla": {
+     "latency_us": 28581.7090002638,
+     "compile_ms": 182.2165829998994,
+     "max_rel_err": 9.526771691525937e-07
+    },
+    "ours+xla": {
+     "latency_us": 28414.250000423635,
+     "compile_ms": 178.45829199950458,
+     "max_rel_err": 9.526771691525937e-07
+    },
+    "inductor": {
+     "latency_us": 16400.999999859778,
+     "compile_ms": 2936.4937079999436,
+     "max_rel_err": 8.097755994640465e-07
+    },
+    "ours+inductor": {
+     "latency_us": 16433.124999821302,
+     "compile_ms": 1296.3676669996858,
+     "max_rel_err": 8.097755994640465e-07
+    }
+   },
+   "extra": {
+    "xla": {
+     "hlo_instructions": 693,
+     "hlo_fusions": 85
+    },
+    "ours+xla": {
+     "hlo_instructions": 693,
+     "hlo_fusions": 85
+    }
+   }
+  }
+ ],
+ "summary": {
+  "ours": {
+   "geomean_speedup_vs_eager": 1.0008988793807045,
+   "cases": 18,
+   "max_rel_err": 2.958154823318182e-07
+  },
+  "xla": {
+   "geomean_speedup_vs_eager": 0.6981419817561056,
+   "cases": 18,
+   "max_rel_err": 9.526771691525937e-07
+  },
+  "ours+xla": {
+   "geomean_speedup_vs_eager": 0.6985867462616204,
+   "cases": 18,
+   "max_rel_err": 9.526771691525937e-07
+  },
+  "inductor": {
+   "geomean_speedup_vs_eager": 0.8565970082206451,
+   "cases": 18,
+   "max_rel_err": 9.761105275174486e-07
+  },
+  "ours+inductor": {
+   "geomean_speedup_vs_eager": 0.877679601832093,
+   "cases": 18,
+   "max_rel_err": 9.761105275174486e-07
+  },
+  "effect_of_our_passes_on_top_of": {
+   "ours+xla_vs_xla": 1.0006370688443573,
+   "ours+inductor_vs_inductor": 1.024612032740158,
+   "ours_vs_eager": 1.0008988793807045
+  }
+ }
+}

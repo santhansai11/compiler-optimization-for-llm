@@ -197,6 +197,8 @@ def canonicalize_attention(graph):
             if pattern is None:
                 continue
             detected += 1
+            while g.has_node(f"FusedAttention_{index}"):  # never reuse a live name
+                index += 1
             fused_name = f"FusedAttention_{index}"
             _replace_attention_pattern(g, pattern, fused_name)
             index += 1

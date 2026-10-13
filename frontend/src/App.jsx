@@ -161,6 +161,8 @@ function App() {
   const [busy, setBusy] = useState('')
   const [learned, setLearned] = useState(null)
   const [gpuRuns, setGpuRuns] = useState(null)
+  const [research, setResearch] = useState(null)
+  const [nsResult, setNsResult] = useState(null)
 
   useEffect(() => {
     api('status').then(() => setHealth('online')).catch(() => setHealth('offline'))
@@ -194,6 +196,7 @@ function App() {
     setArchs(null)
     setAblation(null)
     setLearned(null)
+    setNsResult(null)
     setReport(null)
     setActiveTab('overview')
     const payload = {
@@ -240,6 +243,16 @@ function App() {
   async function loadAblation() {
     setBusy('ablation'); setError('')
     try { setAblation(await api('ablation', { ...workload, model_id: modelId })) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  async function loadResearch() {
+    setBusy('research'); setError('')
+    try { setResearch(await api('research_results')) } catch (e) { setError(e.message) } finally { setBusy('') }
+  }
+
+  async function runNeuroSymbolic() {
+    setBusy('ns'); setError('')
+    try { setNsResult(await api('neuro_symbolic', { ...workload, model_id: modelId })) } catch (e) { setError(e.message) } finally { setBusy('') }
   }
 
   async function loadGpu() {
@@ -335,7 +348,7 @@ function App() {
         {result && <>
           <nav className="tabs-nav" aria-label="Dashboard sections">
             {[
-              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['learned', 'Learned optimizer', Zap], ['gpu', 'Real GPU', Cpu], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
+              ['overview', 'Overview', Gauge], ['graphs', 'Graph transforms', GitBranch], ['archs', 'Architectures', Boxes], ['ablation', 'Ablation', Layers3], ['learned', 'Learned optimizer', Zap], ['gpu', 'Real GPU', Cpu], ['research', 'Research results', Braces], ['diagrams', 'Diagrams', Workflow], ['xla', 'XLA comparison', Cpu], ['sweep', 'Stress sweep', Activity],
             ].map(([id, label, Icon]) => <button key={id} className={`tab-btn ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id)}><Icon size={16} />{label}{id === 'xla' && xla?.all_correct && <span className="tab-check"><Check size={11} /></span>}</button>)}
             {report && <a className="download-btn" href={report.download_url}><Download size={15} /> Download XLSX</a>}
           </nav>
@@ -419,6 +432,7 @@ function App() {
                 <MetricCard label="Reward · oracle" value={learned.oracle.true_reward.toFixed(2)} foot={learned.oracle.label} icon={Check} tone="cyan" />
               </div>
               <div className="metric-note"><Braces size={15} /> Reward = {learned.reward_definition}.</div>
+              {learned.rl_policy && <div className="metric-note"><Zap size={15} /> <b>RL policy</b> (sequential DQN) chose: {learned.rl_policy.actions.join(' → ')} · reward {learned.rl_policy.true_reward.toFixed(2)}</div>}
               <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Top plans by predicted reward</th><th>Predicted</th><th>True</th></tr></thead><tbody>{learned.top_predicted.map((row) => <tr key={row.label}><td>{row.label}</td><td>{row.predicted.toFixed(2)}</td><td>{row.true.toFixed(2)}</td></tr>)}</tbody></table></div></div>
               {learned.training?.lofo_mean && <>
                 <div className="section-intro"><div><div className="eyebrow">TRAINING EVIDENCE</div><h2>Held-out architecture families</h2><p>Each family was excluded from training and then evaluated ({learned.training.graphs_per_family} generated graphs each). Mean regret vs oracle: {learned.training.lofo_mean.regret_pct.toFixed(1)}%.</p></div></div>
@@ -441,6 +455,25 @@ function App() {
               <div className="metric-note"><Braces size={15} /> {run.method}. Dispatch counts are torch calls issued, not a hardware profile. On this GPU the fixed fused-attention kernel is slower than separate matmul+softmax at mid sizes; "autotuned" times both once per shape and keeps the faster.</div>
             </div>) : <div className="panel xla-empty"><h3>No GPU result files found</h3><p>Run <code>python benchmarks/gpu_benchmark.py</code>.</p></div>)}
             {!gpuRuns && <div className="panel xla-empty"><div className="empty-icon"><Cpu size={22} /></div><h3>Load measured GPU results</h3></div>}
+          </div>}
+
+          {activeTab === 'research' && <div className="dashboard animate-fade">
+            <div className="section-intro"><div><div className="eyebrow">EVIDENCE BEHIND THE CLAIMS</div><h2>Research results</h2><p>Every table here is read from a result file in <code>docs/results/</code> produced by a script in this repo. Held-out means the architecture family was never seen in training.</p></div><div className="sweep-actions"><button className="btn-secondary" onClick={loadResearch} disabled={busy === 'research'}>{busy === 'research' ? <RefreshCw size={15} className="spin" /> : <Braces size={15} />}{busy === 'research' ? 'Loading…' : 'Load results'}</button><button className="btn-secondary" onClick={runNeuroSymbolic} disabled={busy === 'ns'}>{busy === 'ns' ? <RefreshCw size={15} className="spin" /> : <Zap size={15} />}{busy === 'ns' ? 'Searching…' : `Run neuro-symbolic search on ${result.model_name}`}</button></div></div>
+            {nsResult && <div className="panel table-panel"><div className="metric-note"><Zap size={15} /> Neuro-symbolic search ({nsResult.guidance}): {nsResult.nodes.original} → {nsResult.nodes.neuro_symbolic} nodes (fixed pipeline: {nsResult.nodes.fixed_pipeline}) in {(nsResult.search_seconds * 1000).toFixed(0)} ms, {nsResult.gpu_measurements_used} GPU measurements, outputs {nsResult.accuracy_preserved ? 'identical' : 'DIFFER'}. Rewrites: {nsResult.rewrites_applied.map((r) => r.rule).join(', ') || 'none'}.</div></div>}
+            {research && <>
+              {research.real_graph_study && <><div className="section-intro"><div><div className="eyebrow">REAL FRAMEWORK GRAPHS</div><h2>Passes on graphs traced from real PyTorch models</h2><p>Traced with torch.fx (make_fx); GPT-2 configs are randomly initialised HuggingFace code paths. Compiled outputs are compared with PyTorch.</p></div></div>
+                <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Model</th><th>Ops</th><th>−normalize</th><th>−attention</th><th>−merge</th><th>Final</th><th>Attention fused</th><th>Max diff vs PyTorch</th><th>Same top-1</th></tr></thead><tbody>{research.real_graph_study.rows.filter((r) => !r.error).map((r) => <tr key={r.model}><td>{r.model}</td><td>{r.nodes_original}</td><td>{r.removed_by_normalize}</td><td>{r.removed_by_attention}</td><td>{r.removed_by_merge}</td><td><b>{r.nodes_after_merge}</b> ({(r.grr * 100).toFixed(0)}% fewer)</td><td>{r.attention_canonicalized}/{r.attention_detected}</td><td>{r.compiled_vs_pytorch_max_diff.toExponential(1)}</td><td>{r.same_top1_pct.toFixed(0)}%</td></tr>)}</tbody></table></div></div></>}
+              {research.cost_calibration && <><div className="section-intro"><div><div className="eyebrow">COST MODEL CALIBRATION</div><h2>Per-op model fitted on a real GPU, tested on held-out architectures</h2><p>{research.cost_calibration.device_name} · fitted on {research.cost_calibration.train_architectures.join(' + ')} · tested on {research.cost_calibration.validation_held_out_architectures.graphs} graphs of the other architectures.</p></div></div>
+                <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Metric (held-out architectures)</th><th>Old hand-written table</th><th>Calibrated model</th></tr></thead><tbody>{(() => { const v = research.cost_calibration.validation_held_out_architectures; return [['Correlation with measured latency (log)', v.latency_log_corr_old_table, v.latency_log_corr_calibrated], ['Mean speedup error', v.speedup_mae_old_table, v.speedup_mae_calibrated], ['Speedup rank correlation', v.speedup_spearman_old_table, v.speedup_spearman_calibrated], ['Median predicted speedup (measured ' + v.measured_speedup_median.toFixed(2) + '×)', v.old_table_speedup_median, v.calibrated_speedup_median]].map(([m, a, b]) => <tr key={m}><td>{m}</td><td>{a.toFixed(2)}</td><td><b>{b.toFixed(2)}</b></td></tr>) })()}</tbody></table></div></div></>}
+              {research.rl_results && <><div className="section-intro"><div><div className="eyebrow">REINFORCEMENT LEARNING</div><h2>Sequential pass policy (DQN) vs baselines</h2><p>Mean reward over held-out families: RL {research.rl_results.lofo_mean.rl.toFixed(2)} · fixed pipeline {research.rl_results.lofo_mean.fixed_pipeline_1dev.toFixed(2)} · random {research.rl_results.lofo_mean.random_policy.toFixed(2)} · best possible {research.rl_results.lofo_mean.oracle.toFixed(2)}.</p></div></div>
+                <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Held-out family</th><th>No passes</th><th>Fixed</th><th>Random</th><th>RL</th><th>Best</th><th>Regret</th></tr></thead><tbody>{Object.entries(research.rl_results.leave_one_family_out).map(([f, r]) => <tr key={f}><td>{f}</td><td>{r.no_passes.toFixed(2)}</td><td>{r.fixed_pipeline_1dev.toFixed(2)}</td><td>{r.random_policy.toFixed(2)}</td><td><b>{r.rl.toFixed(2)}</b></td><td>{r.oracle.toFixed(2)}</td><td>{r.regret_pct.toFixed(1)}%</td></tr>)}</tbody></table></div></div></>}
+              {research.neuro_symbolic_results && <><div className="section-intro"><div><div className="eyebrow">NEURO-SYMBOLIC SEARCH · REAL GPU</div><h2>Latency-GNN-guided rewrites vs fixed pipeline</h2><p>{research.neuro_symbolic_results.device} · latency GNN trained on {research.neuro_symbolic_results.train_graphs} measured graphs · geomean speedup: fixed {research.neuro_symbolic_results.summary.speedup_fixed.toFixed(3)}× · naive order {research.neuro_symbolic_results.summary.speedup_naive.toFixed(3)}× · neuro-symbolic {research.neuro_symbolic_results.summary.speedup_neurosymbolic.toFixed(3)}× · outputs identical: {research.neuro_symbolic_results.summary.all_outputs_match ? 'all' : 'NOT ALL'}.</p></div></div>
+                <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>Held-out architecture</th><th>Latency error</th><th>Rank corr.</th><th>Fixed</th><th>Naive</th><th>Neuro-symbolic</th></tr></thead><tbody>{Object.entries(research.neuro_symbolic_results.leave_one_architecture_out).map(([a, r]) => <tr key={a}><td>{a}</td><td>{r.latency_model.mape_pct.toFixed(1)}%</td><td>{r.latency_model.spearman.toFixed(2)}</td><td>{r.geomean_speedup_fixed.toFixed(3)}×</td><td>{r.geomean_speedup_naive.toFixed(3)}×</td><td><b>{r.geomean_speedup_neurosymbolic.toFixed(3)}×</b></td></tr>)}</tbody></table></div></div></>}
+              {research.compiler_comparison && <><div className="section-intro"><div><div className="eyebrow">SAME GRAPHS · OTHER COMPILERS · CPU</div><h2>XLA and TorchInductor on the same graphs</h2><p>Geomean speedup over the eager interpreter, {research.compiler_comparison.rows.length} architecture×size cases.</p></div></div>
+                <div className="panel table-panel"><div className="table-scroll"><table className="data-table"><thead><tr><th>System</th><th>Geomean speedup vs eager</th></tr></thead><tbody>{Object.entries(research.compiler_comparison.summary).filter(([k]) => k !== 'effect_of_our_passes_on_top_of').map(([k, v]) => <tr key={k}><td>{k}</td><td>{v.geomean_speedup_vs_eager.toFixed(2)}×</td></tr>)}{research.compiler_comparison.summary.effect_of_our_passes_on_top_of && Object.entries(research.compiler_comparison.summary.effect_of_our_passes_on_top_of).map(([k, v]) => <tr key={k}><td><i>{k.replaceAll('_', ' ')}</i></td><td>{v == null ? 'n/a' : `${v.toFixed(3)}×`}</td></tr>)}</tbody></table></div></div></>}
+              {research.lm_full_eval && <div className="metric-note"><Check size={15} /> Trained LM, full validation split ({research.lm_full_eval.validation_characters.toLocaleString()} characters): perplexity PyTorch {research.lm_full_eval.pytorch.perplexity.toFixed(3)} · IR {research.lm_full_eval.ir_original.perplexity.toFixed(3)} · compiled IR {research.lm_full_eval.ir_compiled.perplexity.toFixed(3)} · identical top-1 predictions {research.lm_full_eval.compiled_same_top1_as_pytorch_pct.toFixed(1)}% · graph {research.lm_full_eval.graph_nodes[0]} → {research.lm_full_eval.graph_nodes[1]} nodes.</div>}
+            </>}
+            {!research && <div className="panel xla-empty"><div className="empty-icon"><Braces size={22} /></div><h3>Load the research results</h3></div>}
           </div>}
 
           {activeTab === 'diagrams' && <div className="dashboard animate-fade">

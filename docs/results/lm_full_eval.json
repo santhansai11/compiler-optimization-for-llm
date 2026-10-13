@@ -1,0 +1,28 @@
+{
+ "validation_characters": 110592,
+ "sequences": 1728,
+ "pytorch": {
+  "nll": 1.7139923616691872,
+  "perplexity": 5.551079213119598,
+  "top1_acc": 0.4960123697916667
+ },
+ "ir_original": {
+  "nll": 1.7139923771222432,
+  "perplexity": 5.551079298900737,
+  "top1_acc": 0.4960123697916667
+ },
+ "ir_compiled": {
+  "nll": 1.7139923771222432,
+  "perplexity": 5.551079298900737,
+  "top1_acc": 0.4960123697916667
+ },
+ "max_logit_diff_vs_pytorch": {
+  "ir_original": 9.34600830078125e-05,
+  "ir_compiled": 9.34600830078125e-05
+ },
+ "compiled_same_top1_as_pytorch_pct": 100.0,
+ "graph_nodes": [
+  48,
+  21
+ ]
+}
