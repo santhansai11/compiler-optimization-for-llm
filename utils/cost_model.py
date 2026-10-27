@@ -91,7 +91,7 @@ OP_MEMORY_MB = {
 
 # Pure shape bookkeeping: real runtimes execute these as views with no
 # kernel launch, so they must not count toward kernel-launch metrics.
-VIEW_OPS = {"Reshape", "Cast", "Broadcast", "Identity"}
+VIEW_OPS = {"Reshape", "Broadcast", "Identity", "Input", "Constant"}
 
 DEFAULT_LATENCY_US = 150.0
 DEFAULT_MEMORY_MB = 40.0
@@ -152,7 +152,7 @@ def sequential_latency_us(graph):
         get_op_latency(data.get("op_type"))
         for _, data in graph.nodes(data=True)
     )
-    return total + LAUNCH_OVERHEAD_US * graph.node_count()
+    return total + LAUNCH_OVERHEAD_US * kernel_launches(graph)
 
 
 def scheduled_latency_us(graph):
@@ -161,7 +161,7 @@ def scheduled_latency_us(graph):
     if not schedule or not schedule.get("level_latency_max_us"):
         return sequential_latency_us(graph)
     compute = sum(schedule["level_latency_max_us"])
-    return compute + LAUNCH_OVERHEAD_US * graph.node_count()
+    return compute + LAUNCH_OVERHEAD_US * kernel_launches(graph)
 
 
 def naive_peak_memory_mb(graph):
@@ -223,7 +223,7 @@ def deployment_latency_us(graph):
                      for p in g.predecessors(node)), default=0.0)
         start = max(free.get(d, 0.0), ready)
         finish[node] = start + get_op_latency(g.nodes[node].get("op_type")) \
-            + LAUNCH_OVERHEAD_US
+            + (0.0 if g.nodes[node].get("op_type") in VIEW_OPS else LAUNCH_OVERHEAD_US)
         free[d] = finish[node]
     return max(finish.values(), default=0.0)
 

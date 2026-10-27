@@ -74,6 +74,18 @@ def build(graph):
                 r = jnp.asarray(d.get("value"), dtype=jnp.float32)
             elif op == "Identity":
                 r = ins[0]
+            elif op == "Transpose":
+                dims = d.get("dims")
+                r = jnp.transpose(ins[0], None if dims is None else tuple(dims))
+            elif op == "Reshape":
+                shape = d.get("shape_arg")
+                r = ins[0] if shape is None else jnp.reshape(ins[0], tuple(shape))
+            elif op == "Broadcast":
+                r = jnp.broadcast_to(ins[0], tuple(d["target_shape"]))
+            elif op == "Tanh":
+                r = jnp.tanh(ins[0])
+            elif op == "Pow":
+                r = jnp.power(ins[0], float(d.get("exponent", 2.0)))
             elif op == "Scale":
                 r = ins[0] * float(d.get("factor", 1.0))
             elif op in ("Add", "Mul"):

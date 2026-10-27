@@ -36,6 +36,7 @@ from models.architectures import (
 from models.operations import OPERATION_DEMOS
 from models.tiny_lm import WEIGHTS_PATH as LM_WEIGHTS, build_graph as build_tiny_lm
 from utils.reports import write_report
+from utils.visualization import graph_to_svg
 from pipeline import run_pipeline
 from passes.normalize import normalize as normalize_fx
 from passes.semantic_merge import semantic_merge_attention
@@ -319,6 +320,8 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
             "passes": flags,
             "original_graph": graph_to_d3(orig_graph),
             "optimized_graph": graph_to_d3(opt_graph),
+            "original_svg": graph_to_svg(orig_graph),
+            "optimized_svg": graph_to_svg(opt_graph),
             "metrics": metrics,
             "stages": _stage_table(orig_graph, flags, num_partitions, hypergraph, mode),
             "deployment": {
@@ -524,7 +527,7 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
 
         patterns_supported = [
             {"pattern": "MatMul + Add", "target": "GEMM", "benefit": "Blas GEMM with constant bias absorption, eliminating intermediate tensor."},
-            {"pattern": "GEMM + GELU", "target": "LinearGELU", "benefit": "Fused linear projection + activation epilogue; zero HBM write."},
+            {"pattern": "GEMM + GELU", "target": "LinearGELU", "benefit": "One IR node for projection and activation; kernel and memory savings depend on backend lowering."},
             {"pattern": "Add + LayerNorm", "target": "FusedAddLayerNorm", "benefit": "Fused residual addition and mean/variance reduction."},
             {"pattern": "Q/K/V + QK^T + Scale + Softmax + AV", "target": "FusedAttention", "benefit": "Full FlashAttention sandwich; zero intermediate score tensor traffic."},
             {"pattern": "Scale + Softmax", "target": "FusedScaleSoftmax", "benefit": "Inline scaled softmax reduction kernel."},
@@ -550,7 +553,7 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
                  if isinstance(case, dict) else tuple(map(int, case))
                  for case in cases[:16]]
         warmup = max(1, min(20, int(data.get("warmup", 20))))
-        runs = max(3, min(100, int(data.get("runs", 100))))
+        runs = max(30, min(100, int(data.get("runs", 40))))
         results = []
         for b, s, d in cases:
             res = run_case(b, s, d, warmup=warmup, runs=runs)
@@ -576,6 +579,8 @@ class CompilerAPIHandler(BaseHTTPRequestHandler):
                 "throughput_opt": res["throughput_optimized"],
                 "max_error": res["max_error"],
                 "correct": res["correct"],
+                "timing": res["timing"],
+                "paired_comparison": res["paired_comparison"],
             })
 
         summary = {

@@ -192,6 +192,8 @@ def _find_fuse_pairs(graph):
         pu, pv = g.nodes[u].get("op_type"), g.nodes[v].get("op_type")
         if (pu, pv) not in FUSION_PATTERNS or pu in PROTECTED_OPS or g.out_degree(u) != 1:
             continue
+        if g.nodes[u].get("is_output") or (pu in {"MatMul", "GEMM"} and g.in_degree(u) != 1):
+            continue
         extra = [p for p in g.predecessors(v) if p != u]
         if (pu, pv) == BIAS_FUSION_PAIR:
             if len(extra) > 1 or (extra and g.nodes[extra[0]].get("op_type") != "Constant"):
@@ -210,6 +212,8 @@ def _apply_fuse_pair(graph, m):
     bias = None
     if (g.nodes[u]["op_type"], g.nodes[v]["op_type"]) == BIAS_FUSION_PAIR and extra:
         bias = g.nodes[extra[0]].get("value")
+        if bias is None:
+            bias = 1.0
     _merge_pair(g, u, v, fused, bias, extra)
     return True
 

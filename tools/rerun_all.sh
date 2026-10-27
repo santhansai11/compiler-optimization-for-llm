@@ -16,6 +16,5 @@ step plan-selector    $PY -m search.learned_optimizer train
 step rl-policy        $PY -m search.rl_policy train
 step unseen-arch      $PY benchmarks/unseen_architecture_test.py
 step sensitivity      $PY benchmarks/learned_sensitivity.py
-step figures-readme   $PY tools/make_diagrams.py
-step readme           $PY tools/make_readme.py
+step figures          $PY tools/make_diagrams.py
 echo "=== done $(date +%H:%M:%S)"

@@ -1,7 +1,5 @@
 """Output metrics for the optimization pipeline (the required ten + extras)."""
 
-import numpy as np
-
 from utils.cost_model import (
     CALIBRATED,
     deployment_latency_us,
@@ -11,11 +9,13 @@ from utils.cost_model import (
     scheduled_latency_us,
     sequential_latency_us,
 )
-from utils.executor import compare_latency, execute
+from utils.executor import _make_feed, compare_latency, execute
+from utils.benchmarking import paired_summary
+from utils.validation import compare_outputs
 
 
 def compute_metrics(original_graph, optimized_graph, pass_infos,
-                    compile_time_s, batch_size=4):
+                    compile_time_s, batch_size=4, feed=None):
     """Compute every required output metric; returns a nested dict."""
     nodes_original = original_graph.node_count()
     nodes_optimized = optimized_graph.node_count()
@@ -57,12 +57,15 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
     )
 
     # ---- Measured (NumPy reference executor) ----
-    original_run = execute(original_graph, repeats=3, warmup=1)
-    optimized_run = execute(optimized_graph, repeats=3, warmup=1)
-    # Interleaved A/B timing replaces the two independent estimates.
-    original_run["latency_s"], optimized_run["latency_s"] = compare_latency(
-        original_graph, optimized_graph
-    )
+    shared_feed = _make_feed(original_graph, feed)
+    # Always count the batch actually executed (some builders fix their size).
+    batch_size = int(shared_feed.shape[0]) if shared_feed.ndim else 1
+    original_run = execute(original_graph, repeats=1, warmup=0, feed=shared_feed)
+    optimized_run = execute(optimized_graph, repeats=1, warmup=0, feed=shared_feed)
+    timing = compare_latency(original_graph, optimized_graph, feed=shared_feed, return_record=True)
+    original_run["latency_s"] = timing["median_us"]["original"] / 1e6
+    optimized_run["latency_s"] = timing["median_us"]["optimized"] / 1e6
+    comparison = paired_summary(timing["samples_us"]["original"], timing["samples_us"]["optimized"])
 
     latency_original_ms = original_run["latency_s"] * 1e3
     latency_optimized_ms = optimized_run["latency_s"] * 1e3
@@ -77,23 +80,7 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
     peak_original_mb = original_run["peak_bytes"] / (1024**2)
     peak_optimized_mb = optimized_run["peak_bytes"] / (1024**2)
 
-    out_orig = np.asarray(original_run["output"], dtype=np.float64)
-    out_opt = np.asarray(optimized_run["output"], dtype=np.float64)
-    same_shape = out_orig.shape == out_opt.shape
-    max_abs_diff = (
-        float(np.max(np.abs(out_orig - out_opt)))
-        if same_shape
-        else float("inf")
-    )
-    accuracy_preserved = bool(
-        same_shape
-        and np.allclose(out_orig, out_opt, rtol=1e-4, atol=1e-5)
-    )
-    accuracy_preservation_pct = (
-        100.0
-        if accuracy_preserved
-        else max(0.0, 100.0 - min(99.0, max_abs_diff * 1e3))
-    )
+    accuracy = compare_outputs(original_run["outputs"], optimized_run["outputs"])
 
     # ---- Modeled (per-op GPU cost model; calibrated on a real GPU) ----
     # Primary modeled speedup: one kernel stream per device (what the real
@@ -112,7 +99,9 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
         if overlap_latency_us
         else 1.0
     )
-    modeled_mem_original = naive_peak_memory_mb(original_graph)
+    # Compare both graphs with the same liveness policy; retain the naive
+    # baseline separately instead of attributing all buffer reuse to rewrites.
+    modeled_mem_original = live_range_peak_memory_mb(original_graph)
     modeled_mem_optimized = live_range_peak_memory_mb(optimized_graph)
 
     pass_durations = {
@@ -153,17 +142,18 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
             "batch": batch_size,
         },
         "speedup": speedup,
+        "timing": timing,
+        "paired_comparison": comparison,
+        "performance_conclusion": comparison["ci_direction"] if accuracy["preserved"] else "invalid_output",
         # Required metric 4 (measured)
         "peak_memory_mb": {
             "original": peak_original_mb,
             "optimized": peak_optimized_mb,
+            "unit": "MiB",
+            "scope": "Unique live graph-value storage; excludes kernel temporaries, implicit weights and allocator overhead",
         },
         # Required metric 6
-        "accuracy": {
-            "preserved": accuracy_preserved,
-            "max_abs_diff": max_abs_diff,
-            "preservation_pct": accuracy_preservation_pct,
-        },
+        "accuracy": accuracy,
         # Modeled GPU estimates (cost model) for latency + memory
         "modeled": {
             "latency_original_us": modeled_latency_original_us,
@@ -173,9 +163,11 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
             "parallel_overlap_speedup_upper_bound": parallel_potential,
             "memory_original_mb": modeled_mem_original,
             "memory_optimized_mb": modeled_mem_optimized,
+            "memory_original_naive_mb": naive_peak_memory_mb(original_graph),
+            "memory_method": "Same live-range policy on both graphs; heuristic per-op sizes, not measured GPU allocation",
             "memory_reduction_pct": (
                 (modeled_mem_original - modeled_mem_optimized)
-                / modeled_mem_original
+                / modeled_mem_original * 100.0
                 if modeled_mem_original
                 else 0.0
             ),
@@ -190,6 +182,8 @@ def compute_metrics(original_graph, optimized_graph, pass_infos,
 def format_report(metrics):
     """Plain-text metrics report for the CLI and the UI code block."""
     counts = metrics["counts"]
+    error = metrics["accuracy"]["max_abs_diff"]
+    error_text = f"{error:.3e}" if error is not None else "unavailable (invalid output)"
     lines = [
         "=== LLM Compiler Optimizer - Metrics Report ===",
         "",
@@ -221,14 +215,15 @@ def format_report(metrics):
         f"Speedup                : {metrics['speedup']:6.3f} x  (measured)"
         f" | {metrics['modeled']['speedup']:6.3f} x  (modeled GPU)",
         f"Peak memory (tensors)  : "
-        f"{metrics['peak_memory_mb']['original']:8.2f} MB -> "
-        f"{metrics['peak_memory_mb']['optimized']:8.2f} MB  (measured)",
+        f"{metrics['peak_memory_mb']['original']:8.2f} MiB -> "
+        f"{metrics['peak_memory_mb']['optimized']:8.2f} MiB  (graph storage only)",
         f"Modeled GPU memory     : "
         f"{metrics['modeled']['memory_original_mb']:8.1f} MB -> "
         f"{metrics['modeled']['memory_optimized_mb']:8.1f} MB",
-        f"Accuracy preservation  : "
+        f"Elements within tolerance: "
         f"{metrics['accuracy']['preservation_pct']:6.2f} %  "
-        f"(max |diff| = {metrics['accuracy']['max_abs_diff']:.3e})",
+        f"(max |diff| = {error_text})",
+        f"Timing evidence        : {metrics.get('performance_conclusion', 'unavailable')} (paired 95% interval)",
         "",
         f"Compilation time       : "
         f"{metrics['compilation_time_s'] * 1e3:8.2f} ms",

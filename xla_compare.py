@@ -7,8 +7,8 @@ start when the optional backend has not been installed.
 """
 
 import re
-import statistics
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -19,20 +19,7 @@ from models.attention import AttentionModel
 from passes.dags_fx import schedule_fx
 from passes.normalize import normalize_fx
 from passes.semantic_merge import semantic_merge_attention
-
-
-def _median_latency(call, warmup, runs):
-    with torch.inference_mode():
-        for _ in range(warmup):
-            call()
-        samples = []
-        for _ in range(runs):
-            start = time.perf_counter()
-            output = call()
-            if hasattr(output, "block_until_ready"):
-                output.block_until_ready()
-            samples.append((time.perf_counter() - start) * 1_000)
-    return output, statistics.median(samples)
+from utils.benchmarking import environment_record, paired_summary, randomized_benchmark
 
 
 def compare_attention_xla(batch=4, seq=64, d_model=64, warmup=8, runs=40):
@@ -43,7 +30,7 @@ def compare_attention_xla(batch=4, seq=64, d_model=64, warmup=8, runs=40):
     except ImportError as exc:
         raise RuntimeError(
             "XLA comparison needs JAX. Install project dependencies with "
-            "'.venv\\Scripts\\python.exe -m pip install -r requirements.txt'."
+            "'.venv312\\Scripts\\python.exe -m pip install -r requirements.txt'."
         ) from exc
 
     torch.manual_seed(42)
@@ -60,16 +47,10 @@ def compare_attention_xla(batch=4, seq=64, d_model=64, warmup=8, runs=40):
         raise RuntimeError("The FX attention pattern did not match.")
     optimized_fx, dag = schedule_fx(optimized_fx)
 
-    original_out, original_ms = _median_latency(
-        lambda: original_fx(x), warmup, runs
-    )
-    optimized_out, optimized_ms = _median_latency(
-        lambda: optimized_fx(x), warmup, runs
-    )
-
     x_np = x.numpy()
     wq, wk, wv = (p.detach().numpy() for p in (model.wq, model.wk, model.wv))
-    jx, jq, jk, jv = map(jnp.asarray, (x_np, wq, wk, wv))
+    cpu = jax.devices("cpu")[0]
+    jx, jq, jk, jv = (jax.device_put(a, cpu) for a in (x_np, wq, wk, wv))
 
     def attention(a, q_weight, k_weight, v_weight):
         q = a @ q_weight
@@ -86,9 +67,15 @@ def compare_attention_xla(batch=4, seq=64, d_model=64, warmup=8, runs=40):
     lowered = xla_fn.lower(jx, jq, jk, jv)
     compiled = lowered.compile()
     compile_ms = (time.perf_counter() - compile_started) * 1_000
-    xla_out, xla_ms = _median_latency(
-        lambda: compiled(jx, jq, jk, jv), warmup, runs
-    )
+    # Compile everything before timing, then pair independently randomized rounds.
+    with torch.inference_mode():
+        timing, outputs = randomized_benchmark({
+            "eager": lambda: original_fx(x),
+            "semantic": lambda: optimized_fx(x),
+            "xla": lambda: compiled(jx, jq, jk, jv),
+        }, rounds=max(30, int(runs)), warmup=max(1, int(warmup)), seed=42)
+    original_out, optimized_out, xla_out = (outputs[k] for k in ("eager", "semantic", "xla"))
+    original_ms, optimized_ms, xla_ms = (timing["median_us"][k] / 1000 for k in ("eager", "semantic", "xla"))
 
     xla_array = np.asarray(xla_out)
     torch_array = original_out.detach().numpy()
@@ -128,14 +115,18 @@ def compare_attention_xla(batch=4, seq=64, d_model=64, warmup=8, runs=40):
         backend("XLA (JAX CPU)", xla_ms, xla_array, {
             "compile_ms": float(compile_ms),
             "stablehlo_ops": stablehlo_ops,
-            "device": str(jax.devices()[0]),
+            "device": str(cpu),
         }),
     ]
     return {
         "workload": {"batch": batch, "seq": seq, "d_model": d_model,
                      "dtype": "float32", "device": "CPU"},
-        "warmup_runs": warmup,
-        "timed_runs": runs,
+        "warmup_runs": timing["warmup"],
+        "timed_runs": timing["rounds"],
+        "timing": timing,
+        "paired_comparisons": {k: paired_summary(timing["samples_us"]["eager"], timing["samples_us"][k], seed=42)
+                               for k in ("semantic", "xla")},
+        "environment": environment_record(Path(__file__).resolve().parent),
         "backends": backends,
         "dag_schedule": dag,
         "normalization": {
@@ -144,10 +135,11 @@ def compare_attention_xla(batch=4, seq=64, d_model=64, warmup=8, runs=40):
             "nodes_removed": count_compute_nodes(original_fx) - normalized_nodes,
         },
         "xla_ir": stablehlo,
+        "xla_optimized_hlo": compiled.as_text(),
         "all_correct": all(item["correct_vs_torch"] for item in backends),
         "comparison_note": (
             "Same attention function, weights, input, float32, CPU. "
-            "Latencies are per-call medians after warmup. XLA compile time "
+            "Latencies are medians of at least 30 randomized paired rounds after warmup; raw samples are retained in microseconds. XLA compile time "
             "is reported separately. The FX fusion is a PyTorch reference "
             "function, not a custom GPU kernel. FX node counts and StableHLO operation "
             "counts use different IRs and are not directly equivalent."

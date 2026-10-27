@@ -8,3 +8,4 @@ torch>=2.2
 jax>=0.4.30
 openpyxl>=3.1
 matplotlib>=3.8
+scipy>=1.11

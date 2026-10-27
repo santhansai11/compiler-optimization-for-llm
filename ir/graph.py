@@ -90,6 +90,8 @@ class ComputationGraph:
         # re-order them by source-node insertion order.
         for node, data in self.graph.nodes(data=True):
             clone.graph.add_node(node, **data)
+        for index, node in enumerate(n for n, d in self.graph.nodes(data=True) if d.get("is_output")):
+            clone.graph.nodes[node].setdefault("output_index", index)
         for node in self.graph.nodes():
             for pred in self.graph.predecessors(node):
                 clone.graph.add_edge(pred, node, **self.graph.edges[pred, node])

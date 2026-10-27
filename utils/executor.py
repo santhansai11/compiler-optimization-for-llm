@@ -50,7 +50,10 @@ def _rms_norm(x, eps=1e-6, weight=None):
 
 
 def _silu(x):
-    return (x / (1.0 + np.exp(-x))).astype(np.float32)
+    # exp(-abs(x)) avoids overflow for large negative finite inputs.
+    z = np.exp(-np.abs(x))
+    sigmoid = np.where(x >= 0, 1.0 / (1.0 + z), z / (1.0 + z))
+    return (x * sigmoid).astype(np.float32)
 
 
 def _layer_norm(x, eps=1e-5, weight=None, bias=None):
@@ -88,7 +91,22 @@ def _make_feed(graph, feed):
             vocab = int(config.get("vocab_size", 50257))
             return rng.integers(0, vocab, [batch] + input_shape).astype(np.int64)
         return rng.standard_normal([batch] + input_shape).astype(np.float32)
-    return np.asarray(feed, dtype=np.float32)
+    return np.asarray(feed, dtype=np.int64 if config.get("llm") else np.float32)
+
+
+def _live_storage_bytes(values):
+    """Unique NumPy backing storage retained by graph values (views count once).
+
+    This excludes operator-internal temporaries, Python objects, allocator
+    overhead and implicit weight caches; it is not process or GPU peak memory.
+    """
+    storage = {}
+    for value in values:
+        owner = value
+        while isinstance(getattr(owner, "base", None), np.ndarray):
+            owner = owner.base
+        storage[id(owner)] = int(owner.nbytes)
+    return sum(storage.values())
 
 
 def _make_runner(graph, feed):
@@ -104,24 +122,23 @@ def _make_runner(graph, feed):
     uses0 = {n: graph.graph.out_degree(n) for n in order}
     keep = {n for n in order if nodes[n].get("is_output")}
     sinks = [n for n in order if graph.graph.out_degree(n) == 0]
+    outputs = [n for n in nodes if n in keep] or sinks
+    outputs = sorted(outputs, key=lambda n: nodes[n].get("output_index", outputs.index(n)))
 
     def run_once(track_memory):
         cache = {}
         uses_left = dict(uses0)
-        alive = peak = 0
+        peak = 0
         for node, data, preds in plan:
             out = _compute(node, data, [cache[p] for p in preds], feed)
             cache[node] = out
             if track_memory:
-                alive += int(out.nbytes)
-                peak = max(peak, alive)
+                peak = max(peak, _live_storage_bytes(cache.values()))
             for pred in preds:
                 uses_left[pred] -= 1
                 if uses_left[pred] == 0 and pred not in keep:
-                    if track_memory:
-                        alive -= int(cache[pred].nbytes)
                     del cache[pred]
-        return {n: cache[n] for n in sinks if n in cache}, peak
+        return {n: cache[n] for n in outputs}, peak
 
     return run_once
 
@@ -134,12 +151,11 @@ def _main_output(graph, outputs):
 
 
 def execute(graph, repeats=30, warmup=2, feed=None):
-    """Run the graph; return outputs, best-case latency and peak memory.
-
-    Latency is the minimum over ``repeats`` timed runs (the timeit-style
-    steady-state estimator - least contaminated by OS scheduling noise).
+    """Run the graph; return outputs, median latency and live storage bytes.
     ``feed`` overrides the synthetic input (e.g. real dataset samples).
     """
+    if repeats < 1 or warmup < 0:
+        raise ValueError("repeats must be positive and warmup nonnegative")
     feed = _make_feed(graph, feed)
     run_once = _make_runner(graph, feed)
     for _ in range(warmup):
@@ -153,39 +169,27 @@ def execute(graph, repeats=30, warmup=2, feed=None):
     return {
         "outputs": outputs,
         "output": _main_output(graph, outputs),
-        "latency_s": float(np.min(timings)),
+        "latency_s": float(np.median(timings)),
+        "timings_s": timings,
+        "latency_estimator": "median",
         "peak_bytes": int(peak),
     }
 
 
-def compare_latency(graph_a, graph_b, repeats=60, warmup=3, feed=None):
-    """Interleaved A/B timing: returns ``(min_a_s, min_b_s)``.
+def compare_latency(graph_a, graph_b, repeats=40, warmup=3, feed=None,
+                    return_record=False, seed=0):
+    """Randomized paired timing; returns median seconds or the raw record."""
+    from utils.benchmarking import randomized_benchmark
 
-    Alternating the two graphs inside one loop (and swapping who goes first
-    each round) cancels slow drift from CPU frequency changes or background
-    load, which otherwise biases whichever graph is timed second.
-    """
-    import gc
-
-    run_a = _make_runner(graph_a, _make_feed(graph_a, feed))
-    run_b = _make_runner(graph_b, _make_feed(graph_b, feed))
-    for _ in range(warmup):
-        run_a(False)
-        run_b(False)
-    best = [float("inf"), float("inf")]
-    runners = [run_a, run_b]
-    was_enabled = gc.isenabled()
-    gc.disable()
-    try:
-        for i in range(repeats):
-            for idx in ((0, 1) if i % 2 == 0 else (1, 0)):
-                started = time.perf_counter()
-                runners[idx](False)
-                best[idx] = min(best[idx], time.perf_counter() - started)
-    finally:
-        if was_enabled:
-            gc.enable()
-    return best[0], best[1]
+    shared_feed = _make_feed(graph_a, feed)
+    run_a = _make_runner(graph_a, shared_feed)
+    run_b = _make_runner(graph_b, shared_feed)
+    timing, _ = randomized_benchmark({
+        "original": lambda: run_a(False), "optimized": lambda: run_b(False),
+    }, rounds=max(30, repeats), warmup=max(1, warmup), seed=seed)
+    if return_record:
+        return timing
+    return timing["median_us"]["original"] / 1e6, timing["median_us"]["optimized"] / 1e6
 
 
 def _compute(name, data, ins, feed):
@@ -400,6 +404,8 @@ def _apply_steps(x, steps):
             )
         elif kind == "mm":
             x = (x @ step[1]).astype(np.float32)
+            if len(step) > 2 and step[2] is not None:
+                x = (x + step[2]).astype(np.float32)
     return np.asarray(x, dtype=np.float32)
 
 

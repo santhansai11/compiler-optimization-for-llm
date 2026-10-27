@@ -60,12 +60,13 @@ PARAMETERIZED_OPS = {"MatMul", "GEMM", "LinearGELU", "LinearRelu",
 SEMANTIC_ATTRS = (
     "factor", "start", "stop", "step", "axis", "squeeze", "dims",
     "shape_arg", "fill_value", "where", "eps", "weight", "bias", "value",
+    "exponent", "target_shape", "transpose_rhs", "dtype",
 )
 
 
 def _semantic_sig(data):
     """Hash the semantic attrs of a node (empty string when none)."""
-    import zlib
+    import hashlib
 
     parts = []
     for key in SEMANTIC_ATTRS:
@@ -74,9 +75,9 @@ def _semantic_sig(data):
         value = data[key]
         if isinstance(value, np.ndarray):
             parts.append(
-                (key, value.shape, zlib.crc32(
+                (key, value.shape, str(value.dtype), hashlib.sha256(
                     np.ascontiguousarray(value).tobytes()
-                ))
+                ).hexdigest())
             )
         else:
             parts.append((key, repr(value)))
@@ -117,10 +118,21 @@ def normalize_graph(graph):
         op_type = data.get("op_type", "Operation")
         canonical_type = OP_TYPE_MAP.get(op_type.lower(), op_type)
         canonical_name = re.sub(r"[^a-zA-Z0-9]+", "_", node).strip("_")
+        base_name = canonical_name or "node"
+        canonical_name = base_name
+        suffix = 1
+        while normalized.has_operation(canonical_name):
+            canonical_name = f"{base_name}_{suffix}"
+            suffix += 1
         if canonical_name != node:
             info["renamed"] += 1
         name_map[node] = canonical_name
         attrs = {key: value for key, value in data.items() if key != "op_type"}
+        if canonical_type in {"MatMul", "Gather"} and canonical_name != node:
+            attrs.setdefault("fused_from", [node])
+        if data.get("is_output"):
+            attrs.setdefault("output_index", sum(bool(d.get("is_output"))
+                             for _, d in normalized.nodes(data=True)))
         normalized.add_operation(canonical_name, canonical_type, **attrs)
 
     for target in graph.graph.nodes():  # in-edge order = operand order
@@ -150,16 +162,15 @@ def _remove_identities(graph):
     identity_nodes = [
         node
         for node, data in graph.graph.nodes(data=True)
-        if data.get("op_type") == "Identity"
+        if data.get("op_type") == "Identity" and not data.get("is_output")
     ]
     for node in identity_nodes:
         preds = list(graph.graph.predecessors(node))
         succs = list(graph.graph.successors(node))
-        if not preds:
+        if len(preds) != 1 or any(graph.graph.has_edge(preds[0], s) for s in succs):
             continue
-        for pred in preds:
-            for succ in succs:
-                graph.graph.add_edge(pred, succ)
+        for succ in succs:
+            _replace_input(graph.graph, succ, node, preds[0])
         graph.graph.remove_node(node)
         removed += 1
     return removed
@@ -350,7 +361,7 @@ def _eliminate_view_pairs(graph):
                         and s_flat == (int(np.prod(s_in[:-1])), s_in[-1])
                         and out_shape[:-1] == s_in[:-1]):
                     continue
-                if any(g.has_edge(mid, c) for c in ()):
+                if any(g.has_edge(mid, c) for c in g.successors(node)):
                     continue
                 _replace_input(g, mid, first, src)
                 g.remove_node(first)
@@ -359,6 +370,8 @@ def _eliminate_view_pairs(graph):
                 mid_data["shape"] = out_shape
                 if data.get("is_output"):
                     mid_data["is_output"] = True
+                    if "output_index" in data:
+                        mid_data["output_index"] = data["output_index"]
                 g.remove_node(node)
                 removed += 2
                 changed = True
@@ -420,10 +433,12 @@ def _evaluate(op_type, values, data):
     if op_type == "Sub":
         return np.asarray(values[0] - values[1], dtype=np.float32)
     if op_type == "MatMul":
-        out = values[0]
-        for value in values[1:]:
-            out = out @ value
-        return np.asarray(out, dtype=np.float32)
+        # A single-input implicit projection depends on its node-name seed.
+        if len(values) == 1 and data.get("weight") is None:
+            return None
+        from utils.executor import _matmul
+        return _matmul(values, "constant_fold", data.get("weight"),
+                       transpose_rhs=bool(data.get("transpose_rhs", False)))
     return None
 
 
@@ -473,7 +488,7 @@ def _eliminate_common_subexpressions(graph):
         for node in list(graph.topological_order()):
             data = graph.graph.nodes[node]
             op_type = data.get("op_type")
-            if op_type == "Constant" or op_type in PARAMETERIZED_OPS:
+            if op_type in {"Constant", "Input"} or op_type in PARAMETERIZED_OPS or data.get("is_output"):
                 continue
             preds = list(graph.graph.predecessors(node))
             if op_type in COMMUTATIVE_OPS:
@@ -489,7 +504,7 @@ def _eliminate_common_subexpressions(graph):
                         & set(graph.graph.successors(canonical))):
                     continue
                 for succ in list(graph.graph.successors(node)):
-                    graph.graph.add_edge(canonical, succ)
+                    _replace_input(graph.graph, succ, node, canonical)
                 graph.graph.remove_node(node)
                 merged += 1
                 changed = True

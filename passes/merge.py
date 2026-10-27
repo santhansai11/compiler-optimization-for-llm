@@ -58,7 +58,10 @@ def merge_operators(graph):
             fused_type = FUSION_PATTERNS.get((producer, consumer))
             if fused_type is None or producer in PROTECTED_OPS:
                 continue
-            if g.out_degree(u) != 1:
+            if g.out_degree(u) != 1 or g.nodes[u].get("is_output"):
+                continue
+            # Linear fused kernels implement x @ stored_weight, not A @ B.
+            if producer in {"MatMul", "GEMM"} and g.in_degree(u) != 1:
                 continue
 
             extra_preds = [p for p in g.predecessors(v) if p != u]
@@ -73,6 +76,8 @@ def merge_operators(graph):
                     if g.nodes[const_node].get("op_type") != "Constant":
                         continue
                     bias_value = g.nodes[const_node].get("value")
+                    if bias_value is None:
+                        bias_value = 1.0  # Same default as the reference Constant op.
             elif extra_preds:
                 continue
 
@@ -91,7 +96,7 @@ def merge_operators(graph):
         "pass": "semantic_merging",
         "fusions": sum(fused_types.values()),
         "fused_types": dict(fused_types),
-        "nodes_removed": nodes_removed,
+        "nodes_removed": attention_before - optimized.node_count(),
         "bias_folds": bias_folds,
         "attention_patterns_detected": attention_info.get("detected", 0),
         "attention_patterns_merged": attention_info.get("canonicalized", 0),

@@ -34,6 +34,7 @@ OP_COLORS = {
 FUSED_OPS = {
     "GEMM",
     "LinearGELU",
+    "LinearRelu",
     "FusedAttention",
     "FusedAddLayerNorm",
     "FusedScaleSoftmax",
@@ -91,3 +92,32 @@ def graph_to_dot(graph, show_schedule=True, show_partition=True):
 
     lines.append("}")
     return "\n".join(lines)
+
+
+def graph_to_svg(graph):
+    """Render the same Graphviz figure the report uses, as an SVG string."""
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    dot_bin = shutil.which("dot")
+    if not dot_bin:
+        candidate = Path(r"C:\Program Files\Graphviz\bin\dot.exe")
+        if candidate.exists():
+            dot_bin = str(candidate)
+    if not dot_bin:
+        return None
+
+    proc = subprocess.run(
+        [dot_bin, "-Tsvg"],
+        input=graph_to_dot(graph),
+        text=True,
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    svg = proc.stdout
+    start = svg.find("<svg")
+    return svg[start:] if start >= 0 else svg

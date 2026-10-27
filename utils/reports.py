@@ -6,6 +6,8 @@ it is *measured* (NumPy reference executor / FX / XLA timings), *modeled*
 workbook never mixes provenance silently.
 """
 
+import json
+
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -36,6 +38,8 @@ def metric_rows(m):
     c, lat, thr = m["counts"], m["latency_ms"], m["throughput"]
     mem, mod, acc = m["peak_memory_mb"], m["modeled"], m["accuracy"]
     acr = m.get("attention_canonicalization_rate")
+    error = acc["max_abs_diff"]
+    error_text = f"max |diff| {error:.2e}" if error is not None else "Invalid output; error unavailable"
     return [
         ["Inference latency (ms)", lat["original"], lat["optimized"],
          f"{m['speedup']:.3f}x", "measured (NumPy executor)"],
@@ -45,13 +49,13 @@ def metric_rows(m):
          f"{thr['optimized'] / thr['original']:.3f}x", "measured"],
         ["Speedup (measured)", 1.0, m["speedup"], f"{m['speedup']:.3f}x", "measured"],
         ["Speedup (modeled, GPU-calibrated)", 1.0, mod["speedup"], f"{mod['speedup']:.3f}x", "modeled"],
-        ["Peak tensor memory (MB)", mem["original"], mem["optimized"],
+        ["Live graph storage (MiB)", mem["original"], mem["optimized"],
          f"{(1 - mem['optimized'] / mem['original']) * 100:.1f}% lower" if mem["original"] else "",
-         "measured (live tensors; real GPU peaks in the Real GPU tab)"],
+         "unique backing storage; excludes kernel temporaries and allocator overhead"],
         ["Graph Reduction Ratio (GRR)", "", m["graph_reduction_ratio"],
          f"{c['nodes_original']} -> {c['nodes_optimized']} nodes", "structural"],
-        ["Model accuracy preservation (%)", 100.0, acc["preservation_pct"],
-         f"max |diff| {acc['max_abs_diff']:.2e}", "measured (output equivalence)"],
+        ["Output elements within tolerance (%)", 100.0, acc["preservation_pct"],
+         error_text, "numerical equivalence; not dataset accuracy"],
         ["Operator Merge Ratio (OMR)", "", m["operator_merge_ratio"], "", "structural"],
         ["Attention Canonicalization Rate (ACR)", "",
          acr if acr is not None else "N/A",
@@ -78,8 +82,20 @@ def write_report(path, report):
     _sheet(wb, "Run", ["Field", "Value"], meta)
 
     if report.get("compiler_metrics"):
+        metrics = report["compiler_metrics"]
         _sheet(wb, "Metrics", ["Metric", "Original", "Optimized", "Change", "Kind"],
-               metric_rows(report["compiler_metrics"]))
+               metric_rows(metrics))
+        timing = metrics.get("timing")
+        if timing:
+            _sheet(wb, "CPU raw timings", ["Round", "Execution position", "Variant", "Latency us"],
+                   [[i + 1, pos + 1, name, timing["samples_us"][name][i]]
+                    for i, order in enumerate(timing["round_order"]) for pos, name in enumerate(order)])
+            _sheet(wb, "CPU timing protocol", ["Field", "Value"],
+                   [[k, json.dumps(v)] for k, v in timing.items() if k not in {"round_order", "samples_us"}])
+        _sheet(wb, "CPU paired statistics", ["Statistic", "Value"],
+               [[k, json.dumps(v)] for k, v in metrics.get("paired_comparison", {}).items()])
+        _sheet(wb, "Output validation", ["Statistic", "Value"],
+               [[k, json.dumps(v)] for k, v in metrics["accuracy"].items()])
     if report.get("stages"):
         _sheet(wb, "Pipeline stages",
                ["Stage", "Nodes", "Kernel launches", "Modeled latency (us)"],
@@ -108,8 +124,26 @@ def write_report(path, report):
                 for b in xla["backends"]]
         _sheet(wb, "XLA", ["Backend", "Latency ms", "Tokens/s", "Compile ms",
                            "Max err vs torch", "Correct", "StableHLO ops", "Device"], rows)
+        timing = xla.get("timing", {})
+        if timing:
+            _sheet(wb, "XLA raw timings", ["Round", "Execution position", "Backend", "Latency us"],
+                   [[i + 1, pos + 1, name, timing["samples_us"][name][i]]
+                    for i, order in enumerate(timing["round_order"]) for pos, name in enumerate(order)])
+            _sheet(wb, "XLA timing protocol", ["Field", "Value"],
+                   [[k, json.dumps(v)] for k, v in timing.items() if k not in {"round_order", "samples_us"}])
+        if xla.get("paired_comparisons"):
+            _sheet(wb, "XLA paired statistics", ["Comparison", "Statistic", "Value"],
+                   [[name, key, json.dumps(value)] for name, stats in xla["paired_comparisons"].items()
+                    for key, value in stats.items()])
+        if xla.get("environment"):
+            _sheet(wb, "XLA environment", ["Field", "Value"],
+                   [[k, json.dumps(v)] for k, v in xla["environment"].items()])
+        if xla.get("xla_optimized_hlo"):
+            _sheet(wb, "XLA optimized HLO", ["Line", "Text"],
+                   [[i+1, line] for i,line in enumerate(xla["xla_optimized_hlo"].splitlines())])
     sweep = (report.get("sweep") or {}).get("results")
     if sweep:
         keys = list(sweep[0].keys())
-        _sheet(wb, "Workload sweep", keys, [[r[k] for k in keys] for r in sweep])
+        _sheet(wb, "Workload sweep", keys,
+               [[json.dumps(r[k]) if isinstance(r[k], (dict, list)) else r[k] for k in keys] for r in sweep])
     wb.save(path)

@@ -759,9 +759,9 @@ if not result:
 <div class="lc-head"><span class="lc-icon lc-purple">🧬</span><h2>Optimization Passes</h2></div>
 <div class="pass-list">
 <div class="pass-item"><span class="pass-num">01</span><div><strong>Graph Normalization</strong><br>Cleans up the graph before real optimization starts: canonicalizes node names, removes no-op identity operations, folds constant arithmetic, eliminates duplicate subexpressions (CSE), and deletes unreachable dead nodes.<br><em>42 ops → 38 ops</em></div></div>
-<div class="pass-item"><span class="pass-num">02</span><div><strong>Attention Canonicalization</strong><br>Detects the 7-op Q/K/V→score→scale→softmax→AV pattern and collapses it into a single FusedAttention node — the same trick FlashAttention uses, avoiding writing the huge intermediate score matrix to memory.<br><em>38 ops → 26 ops</em></div></div>
+<div class="pass-item"><span class="pass-num">02</span><div><strong>Attention Canonicalization</strong><br>Detects the Q/K/V→score→scale→softmax→AV pattern and represents it as one FusedAttention IR node. Actual memory savings depend on the backend; the NumPy reference still materializes attention scores.<br><em>38 ops → 26 ops in the example graph</em></div></div>
 <div class="pass-item"><span class="pass-num">03</span><div><strong>Semantic Operator Merging</strong><br>Fuses adjacent op pairs that almost always run together: MatMul+Add→GEMM, GEMM+GELU→LinearGELU, Add+LayerNorm→FusedAddLayerNorm.<br><em>26 ops → 14 ops</em></div></div>
-<div class="pass-item"><span class="pass-num">04</span><div><strong>DAGS Scheduling</strong><br>Dependency-Aware Graph Scheduling. Computes each node's dependency depth and position on the critical path, then orders execution so independent work runs in parallel without stalling.</div></div>
+<div class="pass-item"><span class="pass-num">04</span><div><strong>DAGS Scheduling</strong><br>Dependency-Aware Graph Scheduling computes dependency depth and critical paths. It identifies potential overlap; the NumPy reference executor runs sequentially.</div></div>
 </div>
 </div>
 <div class="linear-card">
@@ -785,6 +785,7 @@ counts = metrics["counts"]
 modeled = metrics["modeled"]
 attention = metrics["attention_subgraphs"]
 acc = metrics["accuracy"]
+error_display = f"{acc['max_abs_diff']:.1e}" if acc['max_abs_diff'] is not None else "unavailable"
 fusions = infos.get("semantic_merging", {}).get("fusions", 0)
 speedup = metrics["speedup"]
 grr = metrics["graph_reduction_ratio"]
@@ -810,7 +811,7 @@ st.markdown(
     {modeled['speedup']:.2f}×</div>
   </div>
   <div class="hero-chips">
-    <span class="hchip">✓ {acc['preservation_pct']:.1f}% accuracy</span>
+    <span class="hchip">{acc['preservation_pct']:.1f}% elements within tolerance</span>
     <span class="hchip">−{klr * 100:.1f}% kernel launches</span>
     <span class="hchip">−{grr * 100:.1f}% graph size</span>
     <span class="hchip">{compile_ms:.1f} ms compile</span>
@@ -910,9 +911,9 @@ with r3:
 with r4:
     st.markdown(_card(
         "Peak Memory (live tensors)",
-        f"{mem1:.2f}<small> MB</small>",
-        sub=f"was {mem0:.2f} MB during execution",
-        chip=f"{mem1 - mem0:+.2f} MB",
+        f"{mem1:.2f}<small> MiB</small>",
+        sub=f"was {mem0:.2f} MiB · graph storage, excludes kernel temporaries",
+        chip=f"{mem1 - mem0:+.2f} MiB",
         chip_kind="good" if mem1 <= mem0 else "bad",
         icon="🧠",
     ), unsafe_allow_html=True)
@@ -923,11 +924,11 @@ st.markdown('<div class="section-title">✅ Accuracy &amp; Compilation</div>',
 a1, a2, a3, a4 = st.columns(4)
 with a1:
     st.markdown(_card(
-        "Accuracy Preservation",
+        "Elements Within Tolerance",
         f"{acc['preservation_pct']:.1f}<small> %</small>",
         sub="original vs optimized outputs",
         chip=("outputs match" if acc["preserved"]
-              else f"max |diff| {acc['max_abs_diff']:.1e}"),
+              else f"max |diff| {error_display}"),
         chip_kind="good" if acc["preserved"] else "bad",
         icon="🎯",
     ), unsafe_allow_html=True)
@@ -945,7 +946,7 @@ with a3:
         "Modeled GPU Latency",
         f"{modeled['latency_optimized_us'] / 1000:.2f}<small> ms</small>",
         sub=(f"was {modeled['latency_original_us'] / 1000:.2f} ms · "
-             "level-parallel DAGS"),
+             "one kernel stream per device"),
         chip=f"{modeled['speedup']:.2f}× modeled",
         chip_kind="flat",
         icon="🖥️",
@@ -954,8 +955,8 @@ with a4:
     st.markdown(_card(
         "Modeled GPU Memory",
         f"{modeled['memory_optimized_mb']:.0f}<small> MB</small>",
-        sub=f"was {modeled['memory_original_mb']:.0f} MB without reuse",
-        chip=f"−{modeled['memory_reduction_pct'] * 100:.0f}% buffer reuse",
+        sub=f"was {modeled['memory_original_mb']:.0f} MB · same liveness policy",
+        chip=f"{modeled['memory_reduction_pct']:.0f}% modeled reduction",
         chip_kind="good",
         icon="💾",
     ), unsafe_allow_html=True)
@@ -975,10 +976,10 @@ summary = pd.DataFrame(
          f"{counts['kernel_launches_original']} → "
          f"{counts['kernel_launches_optimized']}"),
         ("Inference latency (ms)", f"{lat0:.3f}", f"{lat1:.3f}",
-         f"{speedup:.2f}× faster"),
+         f"{speedup:.2f}× ratio of median timings"),
         ("Throughput (samples/s)", f"{thr0:.0f}", f"{thr1:.0f}",
          f"{(thr1 / thr0 - 1) * 100:+.1f}%"),
-        ("Peak memory, live tensors (MB)", f"{mem0:.2f}", f"{mem1:.2f}",
+        ("Live graph storage (MiB)", f"{mem0:.2f}", f"{mem1:.2f}",
          f"{(1 - mem1 / mem0) * 100:.0f}% lower" if mem0 else "—"),
         ("Modeled GPU latency (ms)",
          f"{modeled['latency_original_us'] / 1000:.2f}",
@@ -987,15 +988,21 @@ summary = pd.DataFrame(
         ("Modeled GPU memory (MB)",
          f"{modeled['memory_original_mb']:.0f}",
          f"{modeled['memory_optimized_mb']:.0f}",
-         f"−{modeled['memory_reduction_pct'] * 100:.0f}%"),
-        ("Accuracy preservation", "—", f"{acc['preservation_pct']:.2f}%",
-         f"max |diff| {acc['max_abs_diff']:.1e}"),
+         f"{modeled['memory_reduction_pct']:.0f}% reduction"),
+        ("Elements within tolerance", "—", f"{acc['preservation_pct']:.2f}%",
+         f"max |diff| {error_display}"),
         ("Compilation time", "—", f"{compile_ms:.1f} ms",
          f"{len(infos['pipeline']['passes_run'])} passes"),
     ],
     columns=["Metric", "Original", "Optimized", "Delta"],
 )
 st.dataframe(summary, use_container_width=True, hide_index=True)
+if metrics.get("paired_comparison"):
+    ci = metrics["paired_comparison"]["paired_difference_ci95_us"]
+    st.info(f"{metrics['timing']['rounds']} randomized paired timing rounds; "
+            f"95% interval for median time saved: [{ci[0]:.2f}, {ci[1]:.2f}] us. "
+            f"Conclusion: {metrics['performance_conclusion']}. "
+            "Output equivalence is checked against the original, not labelled dataset accuracy.")
 
 # ------------------------------------------------------------- operator mix
 st.markdown('<div class="section-title">📊 Operator Mix</div>',

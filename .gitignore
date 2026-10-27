@@ -23,3 +23,12 @@ __pycache__/
 frontend/dist/
 *.pyc
 !models/tiny_lm_weights.npz
+
+# Generated documents, review evidence, and temporary exports
+output/
+tmp/
+docs/diagrams/
+docs/legacy/
+docs/*.pdf
+docs/*.png
+/*_graph.png

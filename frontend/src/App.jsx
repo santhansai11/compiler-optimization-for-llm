@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Activity, ArrowUpRight, Boxes, Braces, ChartNoAxesColumn,
   Check, ChevronDown, CircleAlert, Cpu, Download, Gauge, GitBranch,
-  Layers3, Play, RefreshCw, Server, SlidersHorizontal, Workflow, Zap,
+  Layers3, Play, RefreshCw, SlidersHorizontal, Workflow, Zap,
 } from 'lucide-react'
 import './App.css'
 
 const quickCases = [
   [1, 32, 64], [2, 64, 64], [4, 128, 128], [2, 256, 256],
 ]
+
+const errorText = (value) => Number.isFinite(value) ? value.toExponential(2) : 'unavailable'
 
 async function api(path, body) {
   const response = await fetch(`/api/${path}`, {
@@ -66,7 +68,7 @@ function MetricCard({ label, value, foot, icon: Icon, tone = '' }) {
   )
 }
 
-function GraphView({ graph, title, optimized = false }) {
+function GraphView({ graph, title, svg, optimized = false }) {
   const [zoom, setZoom] = useState(1)
   const positions = useMemo(() => {
     if (!graph?.nodes?.length) return { nodes: [], edges: [], width: 780, height: 250 }
@@ -110,6 +112,25 @@ function GraphView({ graph, title, optimized = false }) {
     })
     return { nodes: graph.nodes, edges: graph.edges, points, width, height, byId }
   }, [graph])
+
+  if (svg) {
+    return (
+      <div className="dag-wrap">
+        <div className="dag-title">
+          <strong>{title}</strong>
+          <span>{graph?.nodes?.length || 0} nodes · {graph?.edges?.length || 0} dependencies · Graphviz</span>
+          <div className="graph-zoom">
+            <button aria-label="Zoom out" onClick={() => setZoom((value) => Math.max(.55, value - .15))}>−</button>
+            <button aria-label="Reset zoom" onClick={() => setZoom(1)}>Reset</button>
+            <button aria-label="Zoom in" onClick={() => setZoom((value) => Math.min(2.2, value + .15))}>+</button>
+          </div>
+        </div>
+        <div className="dag-canvas graphviz-canvas">
+          <div className="graphviz-frame" style={{ width: `${zoom * 100}%` }} dangerouslySetInnerHTML={{ __html: svg }} />
+        </div>
+      </div>
+    )
+  }
 
   if (!positions.nodes.length) return <div className="chart-empty">Graph appears after optimization.</div>
   return (
@@ -212,7 +233,7 @@ function App() {
       setActiveTab('graphs')
       let backendResult = null
       try {
-        backendResult = await api('xla_benchmark', { ...workload, warmup: 4, runs: 20 })
+        backendResult = await api('xla_benchmark', { ...workload, warmup: 5, runs: 40 })
         setXla(backendResult)
       } catch (backendError) {
         setXlaError(backendError.message)
@@ -220,7 +241,7 @@ function App() {
       try {
         const saved = await api('export_report', {
           kind: 'compiler_comparison', model_id: modelId, model_name: response.model_name, passes, device: 'CPU', workload,
-          warmup_runs: 4, timed_runs: 20, compiler_metrics: response.metrics, stages: response.stages,
+          warmup_runs: backendResult?.warmup_runs, timed_runs: backendResult?.timed_runs, compiler_metrics: response.metrics, stages: response.stages,
           pass_info: response.pass_info, xla: backendResult,
         })
         setReport(saved)
@@ -358,15 +379,21 @@ function App() {
             <div className="metrics-grid">
               <MetricCard label="Inference latency" value={`${metrics.latency_ms.optimized.toFixed(3)} ms`} foot={`was ${metrics.latency_ms.original.toFixed(3)} ms · measured`} icon={Gauge} />
               <MetricCard label="Throughput" value={`${Math.round(metrics.throughput.optimized).toLocaleString()} /s`} foot={`was ${Math.round(metrics.throughput.original).toLocaleString()} samples/s`} icon={Activity} tone="purple" />
-              <MetricCard label="Speedup" value={`${speedup.toFixed(2)}×`} foot={`measured · ${metrics.modeled.speedup.toFixed(2)}× modeled (GPU-calibrated)`} icon={ArrowUpRight} tone="cyan" />
-              <MetricCard label="Peak tensor memory" value={`${metrics.peak_memory_mb.optimized.toFixed(2)} MB`} foot={`was ${metrics.peak_memory_mb.original.toFixed(2)} MB · measured live tensors`} icon={Boxes} tone="amber" />
+              <MetricCard label="Speedup" value={`${speedup.toFixed(2)}×`} foot={`median timing · ${metrics.performance_conclusion || 'uncertainty unavailable'}`} icon={ArrowUpRight} tone="cyan" />
+              <MetricCard label="Live graph storage" value={`${metrics.peak_memory_mb.optimized.toFixed(2)} MiB`} foot={`was ${metrics.peak_memory_mb.original.toFixed(2)} MiB · excludes kernel temporaries`} icon={Boxes} tone="amber" />
               <MetricCard label="Graph reduction · GRR" value={`${(metrics.graph_reduction_ratio * 100).toFixed(1)}%`} foot={`${counts.nodes_original} → ${counts.nodes_optimized} nodes`} icon={GitBranch} />
-              <MetricCard label="Accuracy preserved" value={metrics.accuracy.preserved ? '100%' : 'Mismatch'} foot={`max error ${metrics.accuracy.max_abs_diff.toExponential(1)}`} icon={Check} tone={metrics.accuracy.preserved ? 'green' : 'amber'} />
+              <MetricCard label="Output equivalence" value={metrics.accuracy.preserved ? 'PASS' : 'Mismatch'} foot={`max error ${errorText(metrics.accuracy.max_abs_diff)}`} icon={Check} tone={metrics.accuracy.preserved ? 'green' : 'amber'} />
               <MetricCard label="Operator merge · OMR" value={`${(metrics.operator_merge_ratio * 100).toFixed(1)}%`} foot="nodes removed by merging" icon={Layers3} tone="purple" />
               <MetricCard label="Attention canon. · ACR" value={metrics.attention_canonicalization_rate == null ? 'N/A' : `${(metrics.attention_canonicalization_rate * 100).toFixed(0)}%`} foot={`${metrics.attention_subgraphs.canonicalized}/${metrics.attention_subgraphs.detected} patterns`} icon={Braces} tone="cyan" />
-              <MetricCard label="Kernel launch reduction" value={`${(metrics.kernel_launch_reduction * 100).toFixed(1)}%`} foot={`${counts.kernel_launches_original} → ${counts.kernel_launches_optimized} launches`} icon={Zap} tone="green" />
+              <MetricCard label="Kernel launch proxy" value={`${(metrics.kernel_launch_reduction * 100).toFixed(1)}%`} foot={`${counts.kernel_launches_original} → ${counts.kernel_launches_optimized} compute nodes · estimated`} icon={Zap} tone="green" />
               <MetricCard label="Compilation time" value={`${(metrics.compilation_time_s * 1000).toFixed(1)} ms`} foot={`${Object.keys(metrics.pass_durations_s || {}).length} stages`} icon={Cpu} />
             </div>
+            {metrics.paired_comparison && <div className="panel">
+              <h3>Before / after validation</h3>
+              <p>{metrics.timing.rounds} randomized paired rounds after {metrics.timing.warmup} warmups; latency and throughput use median timing. Positive time saved means the optimized graph was faster.</p>
+              <p>Median paired time saved: {metrics.paired_comparison.median_paired_difference_us.toFixed(2)} µs; 95% interval [{metrics.paired_comparison.paired_difference_ci95_us.map(v => v.toFixed(2)).join(', ')}] µs. Result: <b>{metrics.performance_conclusion}</b>. An interval spanning zero does not establish a speed improvement. This describes variability within this run.</p>
+              <p>Checked {metrics.accuracy.outputs?.length || 1} outputs, {metrics.accuracy.elements?.toLocaleString()} elements: {metrics.accuracy.preservation_pct.toFixed(2)}% within tolerance. MAE {errorText(metrics.accuracy.mae)}; RMSE {errorText(metrics.accuracy.rmse)}. Tolerance: |optimized − original| ≤ {metrics.accuracy.atol} + {metrics.accuracy.rtol} × |original|. This checks numerical equivalence, not dataset prediction accuracy.</p>
+            </div>}
             <div className="metric-note"><Braces size={15} /> <b>Modeled speedup {metrics.modeled.speedup.toFixed(2)}×</b> uses per-op times calibrated on a real GPU (one kernel stream per device{result.deployment?.devices > 1 ? `, ${result.deployment.devices} devices` : ''}). DAGS could overlap independent kernels for up to <b>{metrics.modeled.parallel_overlap_speedup_upper_bound.toFixed(2)}×</b>, but kernels do not overlap on a single stream, so that is an upper bound, not a claim. Real-GPU measurements are in the Real GPU tab.</div>
             <div className="charts-grid">
               <Panel title="Graph size through the pipeline" eyebrow="NORMALIZATION + FUSION" icon={GitBranch}><BarChart rows={graphSteps.map((step, index) => ({ label: step.stage, value: step.ops, tone: index === graphSteps.length - 1 ? 'tone-purple' : '', detail: `${step.ops} operations` }))} unit=" ops" precision={0} /></Panel>
@@ -380,7 +407,7 @@ function App() {
                 { label: 'Original graph', value: metrics.throughput.original, detail: `batch ${metrics.throughput.batch}` },
                 { label: 'Optimized graph', value: metrics.throughput.optimized, tone: 'tone-purple', detail: `${((metrics.throughput.optimized / metrics.throughput.original - 1) * 100).toFixed(1)}% change` },
               ]} unit=" /s" precision={0} /></Panel>
-              <Panel title="Memory footprint" eyebrow="MEASURED · LIVE TENSORS · MB" icon={Boxes}><BarChart rows={memoryRows} unit=" MB" /></Panel>
+              <Panel title="Memory footprint" eyebrow="UNIQUE LIVE GRAPH STORAGE · MIB" icon={Boxes}><BarChart rows={memoryRows} unit=" MiB" /></Panel>
               <Panel title="Optimization ratios" eyebrow="STRUCTURAL METRICS" icon={ChartNoAxesColumn}><BarChart rows={[
                 { label: 'Graph reduction · GRR', value: metrics.graph_reduction_ratio * 100, detail: `${counts.nodes_original - counts.nodes_optimized} nodes removed` },
                 { label: 'Operator merge · OMR', value: metrics.operator_merge_ratio * 100, tone: 'tone-purple' },
@@ -392,8 +419,8 @@ function App() {
           </div>}
 
           {activeTab === 'graphs' && <div className="charts-grid graph-grid animate-fade">
-            <Panel title="Original computation DAG" eyebrow="BEFORE PASSES" icon={Workflow}><GraphView graph={result.original_graph} title="Original IR" /></Panel>
-            <Panel title="Optimized computation DAG" eyebrow="AFTER SELECTED PASSES" icon={Workflow}><GraphView graph={result.optimized_graph} title="Optimized IR" optimized /></Panel>
+            <Panel title="Original computation DAG" eyebrow="BEFORE PASSES" icon={Workflow}><GraphView graph={result.original_graph} svg={result.original_svg} title="Original IR" /></Panel>
+            <Panel title="Optimized computation DAG" eyebrow="AFTER SELECTED PASSES" icon={Workflow}><GraphView graph={result.optimized_graph} svg={result.optimized_svg} title="Optimized IR" optimized /></Panel>
             <Panel title="Pass-by-pass node count" eyebrow="NORMALIZATION OUTPUT INCLUDED" icon={Layers3}><BarChart rows={graphSteps.map((step, index) => ({ label: step.stage, value: step.ops, tone: index === graphSteps.length - 1 ? 'tone-purple' : '' }))} unit=" ops" precision={0} /></Panel>
           </div>}
 
@@ -506,6 +533,8 @@ function App() {
               </div>
               <div className="metric-note"><Cpu size={15} /> Device: {xla.backends[2].device}. {xla.comparison_note} {xla.warmup_runs} warmup · {xla.timed_runs} measured calls.</div>
               <details className="panel ir-details"><summary>Inspect XLA StableHLO output</summary><pre>{xla.xla_ir}</pre></details>
+              {xla.xla_optimized_hlo && <details className="panel ir-details"><summary>Inspect optimized XLA HLO (after compiler passes)</summary><pre>{xla.xla_optimized_hlo}</pre></details>}
+              {xla.paired_comparisons && <details className="panel ir-details"><summary>Paired timing evidence (microseconds, 95% intervals and exploratory tests)</summary><pre>{JSON.stringify(xla.paired_comparisons, null, 2)}</pre></details>}
             </> : <div className="panel xla-empty"><div className="empty-icon"><Cpu size={22} /></div><h3>XLA comparison unavailable</h3><p>{xlaError || 'Run the comparison after enabling the JAX CPU dependency.'}</p><code>pip install -r requirements.txt</code></div>}
           </div>}
 

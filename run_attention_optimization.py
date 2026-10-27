@@ -24,6 +24,7 @@ from passes.normalize import normalize
 from passes.semantic_merge import semantic_merge_attention
 from passes.dags_fx import schedule_fx
 from visualize import draw_graph
+from utils.benchmarking import paired_summary, randomized_benchmark
 
 
 def benchmark(model, x, warmup=20, runs=100):
@@ -130,9 +131,6 @@ def run_case(batch, seq, d_model, warmup=20, runs=100):
     x = torch.randn(batch, seq, d_model)
 
     original = fx.symbolic_trace(model)
-    original_output, original_latency = benchmark(
-        original, x, warmup=warmup, runs=runs
-    )
     original_nodes = count_compute_nodes(original)
 
     compile_started = time.perf_counter()
@@ -143,9 +141,14 @@ def run_case(batch, seq, d_model, warmup=20, runs=100):
         raise RuntimeError("Attention pattern not detected")
     compile_time_ms = (time.perf_counter() - compile_started) * 1000
 
-    optimized_output, optimized_latency = benchmark(
-        optimized, x, warmup=warmup, runs=runs
-    )
+    with torch.inference_mode():
+        timing, outputs = randomized_benchmark({
+            "original": lambda: original(x), "optimized": lambda: optimized(x),
+        }, rounds=max(30, runs), warmup=max(1, warmup), seed=42)
+    original_output, optimized_output = outputs["original"], outputs["optimized"]
+    original_latency = timing["median_us"]["original"] / 1000.
+    optimized_latency = timing["median_us"]["optimized"] / 1000.
+    comparison = paired_summary(timing["samples_us"]["original"], timing["samples_us"]["optimized"])
     optimized_nodes = count_compute_nodes(optimized)
 
     max_error = (original_output - optimized_output).abs().max().item()
@@ -182,6 +185,8 @@ def run_case(batch, seq, d_model, warmup=20, runs=100):
         "max_error": max_error,
         "correct": correct,
         "peak_gpu_memory_mb": None,
+        "timing": timing,
+        "paired_comparison": comparison,
     }
 
 

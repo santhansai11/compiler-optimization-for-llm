@@ -374,6 +374,9 @@ def _match_attention_pattern(g, sm_name):
         return None
     pattern["input"] = next(iter(inputs))
     pattern["absorbed"] = absorbed - members
+    # Intermediate values explicitly exposed as outputs must remain observable.
+    if any(g.nodes[n].get("is_output") for n in (members | absorbed) - {av}):
+        return None
     if os.environ.get("MATCH_DEBUG"):
         import sys
 
@@ -461,6 +464,7 @@ def _replace_attention_pattern(g, pattern, fused_name):
         mask_consts = {
             p for p in g.predecessors(mask_node)
             if g.nodes[p].get("op_type") == "Constant"
+            and not g.nodes[p].get("is_output")
             and set(g.successors(p)) == {mask_node}
         }
 
@@ -469,6 +473,9 @@ def _replace_attention_pattern(g, pattern, fused_name):
         "fused": True,
         "fused_from": members + sorted(absorbed),
     }
+    for key in ("is_output", "output_index"):
+        if key in g.nodes[pattern["av"]]:
+            attrs[key] = g.nodes[pattern["av"]][key]
     if "factor" in scale_data:
         attrs["factor"] = scale_data["factor"]
     if g.nodes[pattern["score"]].get("transpose_rhs"):
@@ -510,8 +517,9 @@ def _replace_attention_pattern(g, pattern, fused_name):
 
     g.add_node(fused_name, op_type=FUSED_OP_TYPE, **attrs)
     g.add_edge(pattern["input"], fused_name)
+    from passes.normalize import _replace_input
     for succ in outputs:
-        g.add_edge(fused_name, succ)
+        _replace_input(g, succ, pattern["av"], fused_name)
     for node in remove | mask_consts:
         if g.has_node(node):
             g.remove_node(node)
