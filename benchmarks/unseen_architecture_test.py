@@ -26,6 +26,7 @@ from pipeline import run_pipeline  # noqa: E402
 from search import learned_optimizer as lo  # noqa: E402
 from search import neuro_symbolic as ns  # noqa: E402
 from search import rl_policy as rl  # noqa: E402
+from utils.environment import collect as environment  # noqa: E402
 from utils.torch_executor import device_name, gpu_compare, pick_device  # noqa: E402
 
 SIZES = [(2, 128, 128), (4, 64, 64), (8, 256, 256), (4, 256, 512), (8, 512, 512)]
@@ -84,7 +85,8 @@ def gpu():
 
 
 def main():
-    result = {"architecture": "Parallel-block (GPT-J style)", "modeled": modeled(), "gpu": gpu()}
+    result = {"architecture": "Parallel-block (GPT-J style)", "modeled": modeled(), "gpu": gpu(),
+              "environment": environment()}
     (ROOT / "docs" / "results" / "unseen_architecture.json").write_text(json.dumps(result, indent=1))
     print(json.dumps({"modeled": result["modeled"], "gpu": {k: v for k, v in result["gpu"].items() if k != "rows"}}, indent=1))
 

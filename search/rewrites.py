@@ -275,3 +275,43 @@ def apply_rewrite(graph, rule, match):
     except Exception:
         return None
     return new if nx.is_directed_acyclic_graph(new.graph) else None
+
+
+def apply_all(graph, exclude=()):
+    """Apply the first legal rewrite (rule order) until none is left.
+
+    ``exclude`` names rules that are never applied (e.g. ``("cse",)``).
+    Returns ``(graph, applied_rule_names)``.
+    """
+    cur, applied = graph, []
+    while True:
+        for rule, match in enumerate_rewrites(cur):
+            if rule.name in exclude:
+                continue
+            new = apply_rewrite(cur, rule, match)
+            if new is not None:
+                cur = new
+                applied.append(rule.name)
+                break
+        else:
+            return cur, applied
+
+
+def apply_random(graph, count, rng, exclude=()):
+    """Apply ``count`` legal rewrites picked uniformly at random.
+
+    Stops early when no legal rewrite is left. Returns
+    ``(graph, applied_rule_names)``.
+    """
+    cur, applied = graph, []
+    while len(applied) < count:
+        cands = [(r, m) for r, m in enumerate_rewrites(cur) if r.name not in exclude]
+        new = None
+        while cands and new is None:
+            rule, match = cands.pop(int(rng.integers(len(cands))))
+            new = apply_rewrite(cur, rule, match)
+        if new is None:
+            break
+        cur = new
+        applied.append(rule.name)
+    return cur, applied

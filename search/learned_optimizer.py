@@ -31,6 +31,8 @@ import numpy as np
 import torch
 from torch import nn
 
+from utils.environment import collect as collect_environment
+
 ROOT = Path(__file__).resolve().parent.parent
 WEIGHTS_PATH = Path(__file__).with_name("learned_optimizer.pt")
 CACHE_PATH = ROOT / "training" / "artifacts" / "learned_dataset.pkl"
@@ -352,7 +354,8 @@ def train_and_evaluate(per_family=100, epochs=300):
            "actions": [action_label(a) for a in ACTIONS],
            "device_penalty": DEVICE_PENALTY, "pass_penalty": PASS_PENALTY,
            "leave_one_family_out": lofo, "lofo_mean": summary,
-           "random_split_20pct": random_split, "final_train_mse": loss}
+           "random_split_20pct": random_split, "final_train_mse": loss,
+           "environment": collect_environment()}
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(res, indent=1))
     print("LOFO mean:", json.dumps(summary, indent=1))

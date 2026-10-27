@@ -30,6 +30,7 @@ from pipeline import run_pipeline  # noqa: E402
 from utils.cost_model import (CALIBRATED, LEGACY_OP_LATENCY_US,  # noqa: E402
                               deployment_latency_us, sequential_latency_us)
 from utils.executor import execute  # noqa: E402
+from utils.environment import collect as environment  # noqa: E402
 from utils.torch_executor import device_name, gpu_compare, pick_device  # noqa: E402
 
 BUILDERS = {
@@ -141,6 +142,7 @@ def main():
     }
     out = Path(args.out) if args.out else ROOT / "docs" / "results" / f"gpu_{device.type}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
+    result["environment"] = environment()
     out.write_text(json.dumps(result, indent=1))
     print("wrote", out)
     print(json.dumps(result["summary"], indent=1))

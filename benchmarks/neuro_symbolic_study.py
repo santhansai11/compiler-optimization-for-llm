@@ -27,7 +27,8 @@ from benchmarks.gpu_benchmark import BUILDERS  # noqa: E402
 from pipeline import run_pipeline  # noqa: E402
 from search import learned_optimizer as lo  # noqa: E402
 from search import neuro_symbolic as ns  # noqa: E402
-from search.rewrites import apply_rewrite, enumerate_rewrites  # noqa: E402
+from search.rewrites import apply_all, apply_rewrite, enumerate_rewrites  # noqa: E402
+from utils import environment  # noqa: E402
 from utils.torch_executor import device_name, gpu_compare, pick_device, time_graph  # noqa: E402
 
 TRAIN_SIZES = [(2, 128, 128), (4, 64, 64), (8, 256, 256), (4, 256, 512)]
@@ -84,15 +85,7 @@ def build_dataset(device, seed=0):
 
 def naive_fixpoint(graph):
     """Apply the first legal rewrite (rule order) until none is left."""
-    cur = graph
-    while True:
-        for rule, match in enumerate_rewrites(cur):
-            new = apply_rewrite(cur, rule, match)
-            if new is not None:
-                cur = new
-                break
-        else:
-            return cur
+    return apply_all(graph)[0]
 
 
 def spearman(a, b):
@@ -158,7 +151,8 @@ def main():
     summary["all_outputs_match"] = all(r["outputs_match"] for r in cases)
     summary["mean_latency_mape_pct"] = float(np.mean([v["latency_model"]["mape_pct"] for v in lofo.values()]))
     summary["mean_latency_spearman"] = float(np.mean([v["latency_model"]["spearman"] for v in lofo.values()]))
-    out = {"device": device_name(device), "torch": torch.__version__, "train_graphs": len(samples),
+    out = {"device": device_name(device), "torch": torch.__version__,
+           "environment": environment.collect(), "train_graphs": len(samples),
            "attention_lowering": "fixed fused kernel (sdpa)", "leave_one_architecture_out": lofo,
            "summary": summary, "cases": cases, "final_train_loss": loss}
     OUT.write_text(json.dumps(out, indent=1, default=float))

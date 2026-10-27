@@ -102,14 +102,23 @@ def fit_value(samples, epochs=400, seed=0, lr=4e-3):
 
 
 # -------------------------------------------------------------------- search
-def guided_search(graph, score_fn, max_steps=80, tol=0.003):
+def guided_search(graph, score_fn, max_steps=80, tol=0.003, min_speedup=1.0, stats=None):
     """Greedy neuro-symbolic search.
 
     ``score_fn(list_of_graphs) -> predicted log-latency`` (lower is better).
-    Accept the best candidate if it is predicted faster, or predicted within
-    ``tol`` (relative, in log units) AND strictly smaller. Returns
-    ``(graph, trace)``.
+    Accept the best candidate if it is predicted at least ``min_speedup``
+    times faster, or predicted within ``tol`` (relative, in log units) AND
+    strictly smaller. Returns ``(graph, trace)``.
+
+    If ``stats`` is a dict it is filled with decision counts: candidates
+    scored, candidates without a usable (finite) estimate, and how the
+    candidates left at the end were rejected.
     """
+    margin = max(1e-9, math.log(min_speedup))
+    if stats is not None:
+        stats.update({"candidates_scored": 0, "no_estimate": 0,
+                      "final_rejected_predicted_slower": 0,
+                      "final_rejected_below_threshold": 0})
     cur = graph
     cur_score = float(score_fn([cur])[0])
     trace = []
@@ -122,15 +131,23 @@ def guided_search(graph, score_fn, max_steps=80, tol=0.003):
         if not cands:
             break
         scores = np.asarray(score_fn([g for _, g in cands]), dtype=float)
-        order = np.argsort(scores, kind="stable")
+        finite = np.isfinite(scores)
+        if stats is not None:
+            stats["candidates_scored"] += len(cands)
+            stats["no_estimate"] += int((~finite).sum())
+        order = [i for i in np.argsort(np.where(finite, scores, np.inf), kind="stable") if finite[i]]
         chosen = None
         for i in order:
-            better = scores[i] < cur_score - 1e-9
+            better = scores[i] < cur_score - margin
             tie_smaller = scores[i] <= cur_score + tol and cands[i][1].node_count() < cur.node_count()
             if better or tie_smaller:
                 chosen = i
                 break
         if chosen is None:
+            if stats is not None:
+                slower = int(sum(scores[i] >= cur_score for i in order))
+                stats["final_rejected_predicted_slower"] = slower
+                stats["final_rejected_below_threshold"] = len(order) - slower
             break
         trace.append({"rule": cands[chosen][0], "predicted_log_us": float(scores[chosen]),
                       "nodes": cands[chosen][1].node_count()})

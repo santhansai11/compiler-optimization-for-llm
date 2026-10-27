@@ -28,7 +28,7 @@ import torch  # noqa: E402
 
 from benchmarks.gpu_benchmark import BUILDERS  # noqa: E402
 from pipeline import run_pipeline  # noqa: E402
-from utils import jax_executor  # noqa: E402
+from utils import environment, jax_executor  # noqa: E402
 from utils.torch_executor import _Runner, _feed, _main  # noqa: E402
 
 SIZES = [(4, 64, 64), (8, 256, 256), (4, 256, 512)]
@@ -123,7 +123,8 @@ def main():
         pairs[f"{plus}_vs_{base}"] = float(np.exp(np.mean(np.log(sp)))) if sp else None
     summary["effect_of_our_passes_on_top_of"] = pairs
     out = {"device": "cpu", "jax": jax.__version__, "jax_backend": jax.default_backend(),
-           "torch": torch.__version__, "rows": rows, "summary": summary}
+           "torch": torch.__version__, "environment": environment.collect(),
+           "rows": rows, "summary": summary}
     (ROOT / "docs" / "results" / "compiler_comparison.json").write_text(json.dumps(out, indent=1, default=float))
     print(json.dumps(summary, indent=1))
 

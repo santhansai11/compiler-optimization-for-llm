@@ -11,6 +11,8 @@ step calibrate        $PY benchmarks/calibrate_cost_model.py
 step gpu-benchmark    $PY benchmarks/gpu_benchmark.py
 step neuro-symbolic   $PY benchmarks/neuro_symbolic_study.py
 step compilers        $PY benchmarks/compiler_comparison.py
+step xla-rewrites     $PY benchmarks/xla_rewrite_study.py
+step xla-tables       $PY tools/make_xla_tables.py
 step lm-eval          $PY benchmarks/lm_full_eval.py
 step plan-selector    $PY -m search.learned_optimizer train
 step rl-policy        $PY -m search.rl_policy train

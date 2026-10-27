@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from search import learned_optimizer as lo  # noqa: E402
 from utils import cost_model  # noqa: E402
+from utils.environment import collect as environment  # noqa: E402
 
 CONFIGS = [("baseline", 50.0, 0.15), ("cheap transfer", 10.0, 0.15), ("expensive transfer", 150.0, 0.15),
            ("cheap devices", 50.0, 0.05), ("expensive devices", 50.0, 0.30)]
@@ -40,7 +41,8 @@ def main():
                     "best_plan_uses_multiple_devices_pct": float(np.mean([d > 1 for d in devices]) * 100)})
         print(out[-1], flush=True)
     cost_model.COMM_US, lo.DEVICE_PENALTY = 50.0, 0.15
-    (ROOT / "docs" / "results" / "learned_sensitivity.json").write_text(json.dumps(out, indent=1))
+    (ROOT / "docs" / "results" / "learned_sensitivity.json").write_text(json.dumps(
+        {"environment": environment(), "settings": out}, indent=1))
 
 
 if __name__ == "__main__":

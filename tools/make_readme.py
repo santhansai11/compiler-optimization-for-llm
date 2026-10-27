@@ -37,6 +37,34 @@ def arch_table():
     return "\n".join(rows)
 
 
+def xla_study_section(res):
+    """§8: rewrite guidance trained and evaluated on XLA (empty until run)."""
+    if not res:
+        return ("### 8. Rewrite guidance on XLA (`benchmarks/xla_rewrite_study.py`)\n\n"
+                "Not run yet: `python benchmarks/xla_rewrite_study.py && python tools/make_xla_tables.py`.\n")
+    s, m, env = res["policies"]["summary"], res["pair_model"]["mean"], res["environment"]
+    labels = {"all_safe": "All-safe", "guided": "Guided", "random_same": "Random, same count",
+              "fixed_no_cse": "Fixed rule (no CSE)"}
+    rows = "\n".join(
+        f"| {labels[p]} | {v['suite_median_speedup']:.3f}× [{v['suite_median_ci95'][0]:.3f}, {v['suite_median_ci95'][1]:.3f}] | "
+        f"{v['workloads_faster']} | {v['workloads_slower']} | {v['workloads_indistinguishable']} | "
+        f"{v['workloads_hlo_identical_to_none']} |" for p, v in s.items() if p in labels)
+    g = s["guided_vs_all_safe"]
+    pk = env["packages"]
+    return f"""### 8. Rewrite guidance trained and evaluated on XLA (`benchmarks/xla_rewrite_study.py`)
+
+Labels and evaluation use the same target: every graph is compiled with `jax.jit` (XLA, CPU) and timed. {len(res['workloads'])} workloads (6 architectures × {len(res['config']['sizes'])} sizes × base / injected redundancy); the latency GNN is trained leave-one-architecture-out on {len(res['raw']['graphs'])} XLA-timed graphs. Each policy is timed in {res['config']['rounds']} paired rounds with the variant order shuffled every round. Environment: {env['cpu']}, {env['logical_cores']} cores, {env['os']}, jax {pk['jax']}, jaxlib {pk['jaxlib']}.
+
+Pair model on held-out architectures: graph latency MAE {m['latency_mae_us']:.1f} µs ({m['latency_mape_pct']:.1f}%), pair-speedup MAE {m['pair_speedup_mae']:.3f}, pair rank correlation {m['pair_spearman']:.2f} ({m['pair_spearman_near_1']:.2f} for pairs predicted within ±5% of 1).
+
+| Policy (vs no rewriting) | Suite median speedup [95% CI] | Faster | Slower | Indistinguishable | Same optimised HLO as original |
+|---|---|---|---|---|---|
+{rows}
+
+Guided vs all-safe: median ratio {g['median_ratio']:.4f} [{g['median_ratio_ci95'][0]:.4f}, {g['median_ratio_ci95'][1]:.4f}], Wilcoxon p = {g['wilcoxon_p_across_workloads']:.3f}; guided faster on {g['workloads_guided_faster']}, slower on {g['workloads_guided_slower']}, indistinguishable on {g['workloads_indistinguishable']} workloads; identical optimised HLO on {g['workloads_same_hlo']}. Guided search scored {s['guided_decisions'].get('candidates_scored')} candidates, {s['guided_decisions'].get('no_estimate')} without a usable estimate. All tables, the accept/reject confusion, per-rule HLO effects and the raw samples: `docs/results/xla_rewrite_study_tables.md`, `docs/results/xla_rewrite_study_samples.csv`, `docs/results/xla_rewrite_study_hlo/`.
+"""
+
+
 def main():
     real = load("real_graph_study")["rows"]
     cal = load("cost_calibration")
@@ -56,7 +84,9 @@ def main():
     eff = cs["effect_of_our_passes_on_top_of"]
     un = load("unseen_architecture")
     sens = load("learned_sensitivity")
+    sens = sens["settings"] if isinstance(sens, dict) else sens
     other = real_study["other_architectures"] if (real_study := load("real_graph_study")) else []
+    xla_section = xla_study_section(load("xla_rewrite_study"))
 
     real_rows = "\n".join(
         f"| {r['model']} | {r['nodes_original']} | −{r['removed_by_normalize']} | −{r['removed_by_attention']} | "
@@ -86,10 +116,10 @@ A compiler-style optimizer for LLM computation graphs, inspired by XLA/OpenXLA. 
 ```bash
 ./run.sh            # macOS/Linux: API on :8000, GUI on http://127.0.0.1:5173
 run-server.bat      # Windows (create .venv and install requirements.txt first)
-python -m unittest discover -s tests -t .      # 17 correctness tests
+python -m unittest discover -s tests -t .      # 26 tests
 ```
 
-Python 3.12 + Node.js. `pip install -r requirements.txt` (torch, jax, networkx, openpyxl, matplotlib); `pip install -r requirements-real.txt` adds HuggingFace `transformers` for the real-graph study.
+Python 3.12 + Node.js. `pip install -r requirements.txt` (torch, jax, scipy, networkx, openpyxl, matplotlib); `pip install -r requirements-real.txt` adds HuggingFace `transformers` for the real-graph study.
 
 ## What it does
 
@@ -191,6 +221,7 @@ Effect of our passes **on top of** each compiler: XLA ×{eff['ours+xla_vs_xla']:
 |---|---|---|---|---|---|---|---|
 {sens_rows}
 
+{xla_section}
 ## Honest limitations
 
 * **No NVIDIA GPU measured.** Real-GPU numbers are one Apple M3 Pro (Metal/MPS); `benchmarks/colab_gpu_benchmark.ipynb` is untested.
@@ -215,6 +246,7 @@ python -m search.rl_policy train             # §5
 python benchmarks/neuro_symbolic_study.py    # §5   (needs a GPU for timings)
 python benchmarks/compiler_comparison.py     # §6
 python benchmarks/unseen_architecture_test.py && python benchmarks/learned_sensitivity.py
+python benchmarks/xla_rewrite_study.py && python tools/make_xla_tables.py   # §8 (CPU)
 python tools/make_diagrams.py && python tools/make_readme.py
 # or everything, one job at a time:  tools/rerun_all.sh
 ```

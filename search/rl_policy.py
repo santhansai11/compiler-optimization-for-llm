@@ -37,6 +37,7 @@ import torch
 from torch import nn
 
 from search import learned_optimizer as lo
+from utils.environment import collect as collect_environment
 
 ROOT = lo.ROOT
 CACHE = ROOT / "training" / "artifacts" / "rl_tables.pkl"
@@ -276,7 +277,8 @@ def main(per_family=100, steps=2500):
     keys = [k for k in lofo[lo.FAMILIES[0]] if k not in ("graphs", "td_loss")]
     summary = {k: float(np.mean([lofo[f][k] for f in lo.FAMILIES])) for k in keys}
     res = {"families": lo.FAMILIES, "actions": ACTIONS, "steps": steps,
-           "leave_one_family_out": lofo, "lofo_mean": summary}
+           "leave_one_family_out": lofo, "lofo_mean": summary,
+           "environment": collect_environment()}
     RESULTS.parent.mkdir(parents=True, exist_ok=True)
     RESULTS.write_text(json.dumps(res, indent=1))
     print("LOFO mean:", json.dumps(summary, indent=1))

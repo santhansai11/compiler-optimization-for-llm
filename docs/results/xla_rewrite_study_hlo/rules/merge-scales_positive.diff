@@ -1,0 +1,858 @@
+--- before
++++ after
+@@ -1,5 +1,5 @@
+ HloModule m is_scheduled=true, entry_computation_layout={(f32[8,256,256]{2,1,0})->f32[8,256,256]{2,1,0}}, allow_spmd_sharding_propagation_to_parameters={true}, allow_spmd_sharding_propagation_to_output={true}
+ 
+-v415 (v0: f32[2048,256], v1: f32[256,256]) -> f32[2048,256] {
++v409 (v0: f32[2048,256], v1: f32[256,256]) -> f32[2048,256] {
+   v0 = f32[2048,256]{1,0} parameter(0)
+   v1 = f32[256,256]{1,0} parameter(1)
+@@ -7,5 +7,5 @@
+ }
+ 
+-v416 (v3: f32[], v4: f32[]) -> f32[] {
++v410 (v3: f32[], v4: f32[]) -> f32[] {
+   v3 = f32[] parameter(0)
+   v4 = f32[] parameter(1)
+@@ -13,12 +13,12 @@
+ }
+ 
+-v417 (v8: f32[], v6: f32[8,256,256]) -> f32[8,256] {
++v411 (v8: f32[], v6: f32[8,256,256]) -> f32[8,256] {
+   v6 = f32[8,256,256]{2,1,0} parameter(1)
+   v7 = f32[8,256,256]{2,1,0} multiply(v6, v6)
+   v8 = f32[] parameter(0)
+-  ROOT v9 = f32[8,256]{1,0} reduce(v7, v8), dimensions={2}, to_apply=v416
+-}
+-
+-v418 (v10: f32[], v11: f32[]) -> f32[] {
++  ROOT v9 = f32[8,256]{1,0} reduce(v7, v8), dimensions={2}, to_apply=v410
++}
++
++v412 (v10: f32[], v11: f32[]) -> f32[] {
+   v10 = f32[] parameter(0)
+   v11 = f32[] parameter(1)
+@@ -26,11 +26,11 @@
+ }
+ 
+-v419 (v13: f32[8,256,256], v14: f32[]) -> f32[8,256] {
++v413 (v13: f32[8,256,256], v14: f32[]) -> f32[8,256] {
+   v13 = f32[8,256,256]{2,1,0} parameter(0)
+   v14 = f32[] parameter(1)
+-  ROOT v15 = f32[8,256]{1,0} reduce(v13, v14), dimensions={2}, to_apply=v418
+-}
+-
+-v420 (v16: f32[2048,256], v17: f32[256,256]) -> f32[2048,256] {
++  ROOT v15 = f32[8,256]{1,0} reduce(v13, v14), dimensions={2}, to_apply=v412
++}
++
++v414 (v16: f32[2048,256], v17: f32[256,256]) -> f32[2048,256] {
+   v16 = f32[2048,256]{1,0} parameter(0)
+   v17 = f32[256,256]{1,0} parameter(1)
+@@ -38,5 +38,5 @@
+ }
+ 
+-v421 (v19: f32[2048,256], v20: f32[256,256]) -> f32[2048,256] {
++v415 (v19: f32[2048,256], v20: f32[256,256]) -> f32[2048,256] {
+   v19 = f32[2048,256]{1,0} parameter(0)
+   v20 = f32[256,256]{1,0} parameter(1)
+@@ -44,5 +44,5 @@
+ }
+ 
+-v422 (v22: f32[], v23: f32[]) -> f32[] {
++v416 (v22: f32[], v23: f32[]) -> f32[] {
+   v22 = f32[] parameter(0)
+   v23 = f32[] parameter(1)
+@@ -50,12 +50,12 @@
+ }
+ 
+-v423 (v27: f32[], v25: f32[8,256,256]) -> f32[8,256] {
++v417 (v27: f32[], v25: f32[8,256,256]) -> f32[8,256] {
+   v25 = f32[8,256,256]{2,1,0} parameter(1)
+   v26 = f32[8,256,256]{2,1,0} multiply(v25, v25)
+   v27 = f32[] parameter(0)
+-  ROOT v28 = f32[8,256]{1,0} reduce(v26, v27), dimensions={2}, to_apply=v422
+-}
+-
+-v424 (v29: f32[], v30: f32[]) -> f32[] {
++  ROOT v28 = f32[8,256]{1,0} reduce(v26, v27), dimensions={2}, to_apply=v416
++}
++
++v418 (v29: f32[], v30: f32[]) -> f32[] {
+   v29 = f32[] parameter(0)
+   v30 = f32[] parameter(1)
+@@ -63,11 +63,11 @@
+ }
+ 
+-v425 (v32: f32[8,256,256], v33: f32[]) -> f32[8,256] {
++v419 (v32: f32[8,256,256], v33: f32[]) -> f32[8,256] {
+   v32 = f32[8,256,256]{2,1,0} parameter(0)
+   v33 = f32[] parameter(1)
+-  ROOT v34 = f32[8,256]{1,0} reduce(v32, v33), dimensions={2}, to_apply=v424
+-}
+-
+-v426 (v35: f32[8,256,256], v36: f32[8,256,256]) -> f32[8,256,256] {
++  ROOT v34 = f32[8,256]{1,0} reduce(v32, v33), dimensions={2}, to_apply=v418
++}
++
++v420 (v35: f32[8,256,256], v36: f32[8,256,256]) -> f32[8,256,256] {
+   v35 = f32[8,256,256]{2,1,0} parameter(0)
+   v36 = f32[8,256,256]{2,1,0} parameter(1)
+@@ -75,5 +75,5 @@
+ }
+ 
+-v427 (v38: f32[2048,256], v39: f32[256,256]) -> f32[2048,256] {
++v421 (v38: f32[2048,256], v39: f32[256,256]) -> f32[2048,256] {
+   v38 = f32[2048,256]{1,0} parameter(0)
+   v39 = f32[256,256]{1,0} parameter(1)
+@@ -81,5 +81,5 @@
+ }
+ 
+-v428 (v41: f32[], v42: f32[]) -> f32[] {
++v422 (v41: f32[], v42: f32[]) -> f32[] {
+   v41 = f32[] parameter(0)
+   v42 = f32[] parameter(1)
+@@ -87,11 +87,11 @@
+ }
+ 
+-v429 (v44: f32[8,256,256], v45: f32[]) -> f32[8,256] {
++v423 (v44: f32[8,256,256], v45: f32[]) -> f32[8,256] {
+   v44 = f32[8,256,256]{2,1,0} parameter(0)
+   v45 = f32[] parameter(1)
+-  ROOT v46 = f32[8,256]{1,0} reduce(v44, v45), dimensions={2}, to_apply=v428
+-}
+-
+-v430 (v47: f32[], v48: f32[]) -> f32[] {
++  ROOT v46 = f32[8,256]{1,0} reduce(v44, v45), dimensions={2}, to_apply=v422
++}
++
++v424 (v47: f32[], v48: f32[]) -> f32[] {
+   v47 = f32[] parameter(0)
+   v48 = f32[] parameter(1)
+@@ -99,5 +99,5 @@
+ }
+ 
+-v431 (v61: f32[], v50: f32[2048,256]) -> f32[8,256,256] {
++v425 (v61: f32[], v50: f32[2048,256]) -> f32[8,256,256] {
+   v50 = f32[2048,256]{1,0} parameter(1)
+   v51 = f32[256,256]{1,0} constant({...})
+@@ -112,5 +112,5 @@
+   v60 = f32[8,256,256]{2,1,0} multiply(v57, v59)
+   v61 = f32[] parameter(0)
+-  v62 = f32[8,256]{1,0} reduce(v60, v61), dimensions={2}, to_apply=v430
++  v62 = f32[8,256]{1,0} reduce(v60, v61), dimensions={2}, to_apply=v424
+   v63 = f32[8,256,256]{2,1,0} broadcast(v62), dimensions={0,1}
+   v64 = f32[8,256,256]{2,1,0} subtract(v60, v63)
+@@ -118,5 +118,5 @@
+ }
+ 
+-v432 (v66: f32[], v67: f32[]) -> f32[] {
++v426 (v66: f32[], v67: f32[]) -> f32[] {
+   v66 = f32[] parameter(0)
+   v67 = f32[] parameter(1)
+@@ -124,12 +124,12 @@
+ }
+ 
+-v433 (v71: f32[], v69: f32[8,256,256]) -> f32[8,256] {
++v427 (v71: f32[], v69: f32[8,256,256]) -> f32[8,256] {
+   v69 = f32[8,256,256]{2,1,0} parameter(1)
+   v70 = f32[8,256,256]{2,1,0} multiply(v69, v69)
+   v71 = f32[] parameter(0)
+-  ROOT v72 = f32[8,256]{1,0} reduce(v70, v71), dimensions={2}, to_apply=v432
+-}
+-
+-v434 (v73: f32[], v74: f32[]) -> f32[] {
++  ROOT v72 = f32[8,256]{1,0} reduce(v70, v71), dimensions={2}, to_apply=v426
++}
++
++v428 (v73: f32[], v74: f32[]) -> f32[] {
+   v73 = f32[] parameter(0)
+   v74 = f32[] parameter(1)
+@@ -137,11 +137,11 @@
+ }
+ 
+-v435 (v76: f32[8,256,256], v77: f32[]) -> f32[8,256] {
++v429 (v76: f32[8,256,256], v77: f32[]) -> f32[8,256] {
+   v76 = f32[8,256,256]{2,1,0} parameter(0)
+   v77 = f32[] parameter(1)
+-  ROOT v78 = f32[8,256]{1,0} reduce(v76, v77), dimensions={2}, to_apply=v434
+-}
+-
+-v436 (v79: f32[2048,256], v80: f32[256,256]) -> f32[2048,256] {
++  ROOT v78 = f32[8,256]{1,0} reduce(v76, v77), dimensions={2}, to_apply=v428
++}
++
++v430 (v79: f32[2048,256], v80: f32[256,256]) -> f32[2048,256] {
+   v79 = f32[2048,256]{1,0} parameter(0)
+   v80 = f32[256,256]{1,0} parameter(1)
+@@ -149,5 +149,5 @@
+ }
+ 
+-v437 (v82: f32[2048,256], v83: f32[256,256]) -> f32[2048,256] {
++v431 (v82: f32[2048,256], v83: f32[256,256]) -> f32[2048,256] {
+   v82 = f32[2048,256]{1,0} parameter(0)
+   v83 = f32[256,256]{1,0} parameter(1)
+@@ -155,5 +155,5 @@
+ }
+ 
+-v438 (v85: f32[], v86: f32[]) -> f32[] {
++v432 (v85: f32[], v86: f32[]) -> f32[] {
+   v85 = f32[] parameter(0)
+   v86 = f32[] parameter(1)
+@@ -161,12 +161,12 @@
+ }
+ 
+-v439 (v90: f32[], v88: f32[8,256,256]) -> f32[8,256] {
++v433 (v90: f32[], v88: f32[8,256,256]) -> f32[8,256] {
+   v88 = f32[8,256,256]{2,1,0} parameter(1)
+   v89 = f32[8,256,256]{2,1,0} multiply(v88, v88)
+   v90 = f32[] parameter(0)
+-  ROOT v91 = f32[8,256]{1,0} reduce(v89, v90), dimensions={2}, to_apply=v438
+-}
+-
+-v440 (v92: f32[], v93: f32[]) -> f32[] {
++  ROOT v91 = f32[8,256]{1,0} reduce(v89, v90), dimensions={2}, to_apply=v432
++}
++
++v434 (v92: f32[], v93: f32[]) -> f32[] {
+   v92 = f32[] parameter(0)
+   v93 = f32[] parameter(1)
+@@ -174,11 +174,11 @@
+ }
+ 
+-v441 (v95: f32[8,256,256], v96: f32[]) -> f32[8,256] {
++v435 (v95: f32[8,256,256], v96: f32[]) -> f32[8,256] {
+   v95 = f32[8,256,256]{2,1,0} parameter(0)
+   v96 = f32[] parameter(1)
+-  ROOT v97 = f32[8,256]{1,0} reduce(v95, v96), dimensions={2}, to_apply=v440
+-}
+-
+-v442 (v98: f32[8,256,256], v99: f32[8,256,256]) -> f32[8,256,256] {
++  ROOT v97 = f32[8,256]{1,0} reduce(v95, v96), dimensions={2}, to_apply=v434
++}
++
++v436 (v98: f32[8,256,256], v99: f32[8,256,256]) -> f32[8,256,256] {
+   v98 = f32[8,256,256]{2,1,0} parameter(0)
+   v99 = f32[8,256,256]{2,1,0} parameter(1)
+@@ -186,5 +186,5 @@
+ }
+ 
+-v443 (v101: f32[2048,256], v102: f32[256,256]) -> f32[2048,256] {
++v437 (v101: f32[2048,256], v102: f32[256,256]) -> f32[2048,256] {
+   v101 = f32[2048,256]{1,0} parameter(0)
+   v102 = f32[256,256]{1,0} parameter(1)
+@@ -192,5 +192,5 @@
+ }
+ 
+-v444 (v104: f32[], v105: f32[]) -> f32[] {
++v438 (v104: f32[], v105: f32[]) -> f32[] {
+   v104 = f32[] parameter(0)
+   v105 = f32[] parameter(1)
+@@ -198,11 +198,11 @@
+ }
+ 
+-v445 (v107: f32[8,256,256], v108: f32[]) -> f32[8,256] {
++v439 (v107: f32[8,256,256], v108: f32[]) -> f32[8,256] {
+   v107 = f32[8,256,256]{2,1,0} parameter(0)
+   v108 = f32[] parameter(1)
+-  ROOT v109 = f32[8,256]{1,0} reduce(v107, v108), dimensions={2}, to_apply=v444
+-}
+-
+-v446 (v110: f32[], v111: f32[]) -> f32[] {
++  ROOT v109 = f32[8,256]{1,0} reduce(v107, v108), dimensions={2}, to_apply=v438
++}
++
++v440 (v110: f32[], v111: f32[]) -> f32[] {
+   v110 = f32[] parameter(0)
+   v111 = f32[] parameter(1)
+@@ -210,5 +210,5 @@
+ }
+ 
+-v447 (v126: f32[], v124: f32[8,256,256], v113: f32[2048,256]) -> f32[8,256,256] {
++v441 (v126: f32[], v124: f32[8,256,256], v113: f32[2048,256]) -> f32[8,256,256] {
+   v113 = f32[2048,256]{1,0} parameter(2)
+   v114 = f32[256,256]{1,0} constant({...})
+@@ -225,5 +225,5 @@
+   v125 = f32[8,256,256]{2,1,0} multiply(v123, v124)
+   v126 = f32[] parameter(0)
+-  v127 = f32[8,256]{1,0} reduce(v125, v126), dimensions={2}, to_apply=v446
++  v127 = f32[8,256]{1,0} reduce(v125, v126), dimensions={2}, to_apply=v440
+   v128 = f32[8,256,256]{2,1,0} broadcast(v127), dimensions={0,1}
+   v129 = f32[8,256,256]{2,1,0} subtract(v125, v128)
+@@ -231,5 +231,5 @@
+ }
+ 
+-v448 (v131: f32[], v132: f32[]) -> f32[] {
++v442 (v131: f32[], v132: f32[]) -> f32[] {
+   v131 = f32[] parameter(0)
+   v132 = f32[] parameter(1)
+@@ -237,12 +237,12 @@
+ }
+ 
+-v449 (v136: f32[], v134: f32[8,256,256]) -> f32[8,256] {
++v443 (v136: f32[], v134: f32[8,256,256]) -> f32[8,256] {
+   v134 = f32[8,256,256]{2,1,0} parameter(1)
+   v135 = f32[8,256,256]{2,1,0} multiply(v134, v134)
+   v136 = f32[] parameter(0)
+-  ROOT v137 = f32[8,256]{1,0} reduce(v135, v136), dimensions={2}, to_apply=v448
+-}
+-
+-v450 (v138: f32[], v139: f32[]) -> f32[] {
++  ROOT v137 = f32[8,256]{1,0} reduce(v135, v136), dimensions={2}, to_apply=v442
++}
++
++v444 (v138: f32[], v139: f32[]) -> f32[] {
+   v138 = f32[] parameter(0)
+   v139 = f32[] parameter(1)
+@@ -250,11 +250,11 @@
+ }
+ 
+-v451 (v141: f32[8,256,256], v142: f32[]) -> f32[8,256] {
++v445 (v141: f32[8,256,256], v142: f32[]) -> f32[8,256] {
+   v141 = f32[8,256,256]{2,1,0} parameter(0)
+   v142 = f32[] parameter(1)
+-  ROOT v143 = f32[8,256]{1,0} reduce(v141, v142), dimensions={2}, to_apply=v450
+-}
+-
+-v452 (v151: f32[8,256], v144: f32[8,256,256], v145: f32[8,256]) -> f32[2048,256] {
++  ROOT v143 = f32[8,256]{1,0} reduce(v141, v142), dimensions={2}, to_apply=v444
++}
++
++v446 (v151: f32[8,256], v144: f32[8,256,256], v145: f32[8,256]) -> f32[2048,256] {
+   v144 = f32[8,256,256]{2,1,0} parameter(1)
+   v145 = f32[8,256]{1,0} parameter(2)
+@@ -270,5 +270,5 @@
+ }
+ 
+-v453 (v155: f32[8,256]) -> f32[8,256] {
++v447 (v155: f32[8,256]) -> f32[8,256] {
+   v155 = f32[8,256]{1,0} parameter(0)
+   v156 = f32[] constant(0.00390625)
+@@ -281,5 +281,5 @@
+ }
+ 
+-v454 (v163: f32[8,256,256], v164: f32[8,256]) -> f32[8,256,256] {
++v448 (v163: f32[8,256,256], v164: f32[8,256]) -> f32[8,256,256] {
+   v163 = f32[8,256,256]{2,1,0} parameter(0)
+   v164 = f32[8,256]{1,0} parameter(1)
+@@ -291,5 +291,5 @@
+ }
+ 
+-v455 (v172: f32[8,256,256], v170: f32[2048,256]) -> f32[8,256,256] {
++v449 (v172: f32[8,256,256], v170: f32[2048,256]) -> f32[8,256,256] {
+   v170 = f32[2048,256]{1,0} parameter(1)
+   v171 = f32[8,256,256]{2,1,0} bitcast(v170)
+@@ -298,5 +298,5 @@
+ }
+ 
+-v456 (v174: f32[2048,256]) -> f32[2048,256] {
++v450 (v174: f32[2048,256]) -> f32[2048,256] {
+   v174 = f32[2048,256]{1,0} parameter(0)
+   v175 = f32[8,256,256]{2,1,0} bitcast(v174)
+@@ -321,5 +321,5 @@
+ }
+ 
+-v457 (v201: f32[8,256], v194: f32[8,256,256], v195: f32[8,256]) -> f32[2048,256] {
++v451 (v201: f32[8,256], v194: f32[8,256,256], v195: f32[8,256]) -> f32[2048,256] {
+   v194 = f32[8,256,256]{2,1,0} parameter(1)
+   v195 = f32[8,256]{1,0} parameter(2)
+@@ -335,5 +335,5 @@
+ }
+ 
+-v458 (v205: f32[8,256]) -> f32[8,256] {
++v452 (v205: f32[8,256]) -> f32[8,256] {
+   v205 = f32[8,256]{1,0} parameter(0)
+   v206 = f32[] constant(0.00390625)
+@@ -346,5 +346,5 @@
+ }
+ 
+-v459 (v213: f32[8,256,256], v214: f32[8,256]) -> f32[8,256,256] {
++v453 (v213: f32[8,256,256], v214: f32[8,256]) -> f32[8,256,256] {
+   v213 = f32[8,256,256]{2,1,0} parameter(0)
+   v214 = f32[8,256]{1,0} parameter(1)
+@@ -356,254 +356,248 @@
+ }
+ 
+-v460 (v227: f32[8,256,256], v220: f32[8,256,256]) -> f32[8,256,256] {
+-  v220 = f32[8,256,256]{2,1,0} parameter(1)
+-  v221 = f32[] constant(2)
+-  v222 = f32[8,256,256]{2,1,0} broadcast(v221), dimensions={}
+-  v223 = f32[8,256,256]{2,1,0} multiply(v220, v222)
+-  v224 = f32[] constant(0.5)
+-  v225 = f32[8,256,256]{2,1,0} broadcast(v224), dimensions={}
+-  v226 = f32[8,256,256]{2,1,0} multiply(v223, v225)
+-  v227 = f32[8,256,256]{2,1,0} parameter(0)
+-  ROOT v228 = f32[8,256,256]{2,1,0} add(v226, v227)
+-}
+-
+-v461 (v229: f32[8,256,256], v230: f32[8,256]) -> f32[8,256,256] {
+-  v229 = f32[8,256,256]{2,1,0} parameter(0)
+-  v230 = f32[8,256]{1,0} parameter(1)
+-  v231 = f32[8,256,256]{2,1,0} broadcast(v230), dimensions={0,1}
+-  ROOT v232 = f32[8,256,256]{2,1,0} multiply(v229, v231)
+-}
+-
+-v462 (v235: f32[8,256]) -> f32[8,256] {
+-  v233 = f32[] constant(1)
+-  v234 = f32[8,256]{1,0} broadcast(v233), dimensions={}
++v454 (v220: f32[8,256,256], v221: f32[8,256]) -> f32[8,256,256] {
++  v220 = f32[8,256,256]{2,1,0} parameter(0)
++  v221 = f32[8,256]{1,0} parameter(1)
++  v222 = f32[8,256,256]{2,1,0} broadcast(v221), dimensions={0,1}
++  ROOT v223 = f32[8,256,256]{2,1,0} multiply(v220, v222)
++}
++
++v455 (v226: f32[8,256]) -> f32[8,256] {
++  v224 = f32[] constant(1)
++  v225 = f32[8,256]{1,0} broadcast(v224), dimensions={}
++  v226 = f32[8,256]{1,0} parameter(0)
++  ROOT v227 = f32[8,256]{1,0} divide(v225, v226)
++}
++
++v456 (v235: f32[8,256], v228: f32[8,256,256], v229: f32[8,256]) -> f32[2048,256] {
++  v228 = f32[8,256,256]{2,1,0} parameter(1)
++  v229 = f32[8,256]{1,0} parameter(2)
++  v230 = f32[] constant(0.00390625)
++  v231 = f32[8,256]{1,0} broadcast(v230), dimensions={}
++  v232 = f32[8,256]{1,0} multiply(v229, v231)
++  v233 = f32[8,256,256]{2,1,0} broadcast(v232), dimensions={0,1}
++  v234 = f32[8,256,256]{2,1,0} subtract(v228, v233)
+   v235 = f32[8,256]{1,0} parameter(0)
+-  ROOT v236 = f32[8,256]{1,0} divide(v234, v235)
+-}
+-
+-v463 (v244: f32[8,256], v237: f32[8,256,256], v238: f32[8,256]) -> f32[2048,256] {
+-  v237 = f32[8,256,256]{2,1,0} parameter(1)
+-  v238 = f32[8,256]{1,0} parameter(2)
+-  v239 = f32[] constant(0.00390625)
+-  v240 = f32[8,256]{1,0} broadcast(v239), dimensions={}
+-  v241 = f32[8,256]{1,0} multiply(v238, v240)
+-  v242 = f32[8,256,256]{2,1,0} broadcast(v241), dimensions={0,1}
+-  v243 = f32[8,256,256]{2,1,0} subtract(v237, v242)
+-  v244 = f32[8,256]{1,0} parameter(0)
+-  v245 = f32[8,256,256]{2,1,0} broadcast(v244), dimensions={0,1}
+-  v246 = f32[8,256,256]{2,1,0} multiply(v243, v245)
+-  ROOT v247 = f32[2048,256]{1,0} bitcast(v246)
+-}
+-
+-v464 (v248: f32[8,256]) -> f32[8,256] {
+-  v248 = f32[8,256]{1,0} parameter(0)
++  v236 = f32[8,256,256]{2,1,0} broadcast(v235), dimensions={0,1}
++  v237 = f32[8,256,256]{2,1,0} multiply(v234, v236)
++  ROOT v238 = f32[2048,256]{1,0} bitcast(v237)
++}
++
++v457 (v239: f32[8,256]) -> f32[8,256] {
++  v239 = f32[8,256]{1,0} parameter(0)
++  v240 = f32[] constant(0.00390625)
++  v241 = f32[8,256]{1,0} broadcast(v240), dimensions={}
++  v242 = f32[8,256]{1,0} multiply(v239, v241)
++  v243 = f32[] constant(1e-05)
++  v244 = f32[8,256]{1,0} broadcast(v243), dimensions={}
++  v245 = f32[8,256]{1,0} add(v242, v244)
++  ROOT v246 = f32[8,256]{1,0} rsqrt(v245)
++}
++
++v458 (v247: f32[8,256,256], v248: f32[8,256]) -> f32[8,256,256] {
++  v247 = f32[8,256,256]{2,1,0} parameter(0)
++  v248 = f32[8,256]{1,0} parameter(1)
+   v249 = f32[] constant(0.00390625)
+   v250 = f32[8,256]{1,0} broadcast(v249), dimensions={}
+   v251 = f32[8,256]{1,0} multiply(v248, v250)
+-  v252 = f32[] constant(1e-05)
+-  v253 = f32[8,256]{1,0} broadcast(v252), dimensions={}
+-  v254 = f32[8,256]{1,0} add(v251, v253)
+-  ROOT v255 = f32[8,256]{1,0} rsqrt(v254)
+-}
+-
+-v465 (v256: f32[8,256,256], v257: f32[8,256]) -> f32[8,256,256] {
++  v252 = f32[8,256,256]{2,1,0} broadcast(v251), dimensions={0,1}
++  ROOT v253 = f32[8,256,256]{2,1,0} subtract(v247, v252)
++}
++
++v459 (v256: f32[8,256,256], v254: f32[2048,256]) -> f32[8,256,256] {
++  v254 = f32[2048,256]{1,0} parameter(1)
++  v255 = f32[8,256,256]{2,1,0} bitcast(v254)
+   v256 = f32[8,256,256]{2,1,0} parameter(0)
+-  v257 = f32[8,256]{1,0} parameter(1)
+-  v258 = f32[] constant(0.00390625)
+-  v259 = f32[8,256]{1,0} broadcast(v258), dimensions={}
+-  v260 = f32[8,256]{1,0} multiply(v257, v259)
+-  v261 = f32[8,256,256]{2,1,0} broadcast(v260), dimensions={0,1}
+-  ROOT v262 = f32[8,256,256]{2,1,0} subtract(v256, v261)
+-}
+-
+-v466 (v265: f32[8,256,256], v263: f32[2048,256]) -> f32[8,256,256] {
+-  v263 = f32[2048,256]{1,0} parameter(1)
+-  v264 = f32[8,256,256]{2,1,0} bitcast(v263)
+-  v265 = f32[8,256,256]{2,1,0} parameter(0)
+-  ROOT v266 = f32[8,256,256]{2,1,0} add(v264, v265)
+-}
+-
+-v467 (v267: f32[2048,256]) -> f32[2048,256] {
+-  v267 = f32[2048,256]{1,0} parameter(0)
+-  v268 = f32[8,256,256]{2,1,0} bitcast(v267)
+-  v269 = f32[8,256,256]{2,1,0} multiply(v268, v268)
+-  v270 = f32[8,256,256]{2,1,0} multiply(v269, v268)
+-  v271 = f32[] constant(0.044715)
+-  v272 = f32[8,256,256]{2,1,0} broadcast(v271), dimensions={}
+-  v273 = f32[8,256,256]{2,1,0} multiply(v270, v272)
+-  v274 = f32[8,256,256]{2,1,0} add(v268, v273)
+-  v275 = f32[] constant(0.797884583)
+-  v276 = f32[8,256,256]{2,1,0} broadcast(v275), dimensions={}
+-  v277 = f32[8,256,256]{2,1,0} multiply(v274, v276)
+-  v278 = f32[8,256,256]{2,1,0} tanh(v277)
+-  v279 = f32[] constant(1)
+-  v280 = f32[8,256,256]{2,1,0} broadcast(v279), dimensions={}
+-  v281 = f32[8,256,256]{2,1,0} add(v278, v280)
+-  v282 = f32[] constant(0.5)
+-  v283 = f32[8,256,256]{2,1,0} broadcast(v282), dimensions={}
+-  v284 = f32[8,256,256]{2,1,0} multiply(v281, v283)
+-  v285 = f32[8,256,256]{2,1,0} multiply(v268, v284)
+-  ROOT v286 = f32[2048,256]{1,0} bitcast(v285)
+-}
+-
+-v468 (v294: f32[8,256], v287: f32[8,256,256], v288: f32[8,256]) -> f32[2048,256] {
+-  v287 = f32[8,256,256]{2,1,0} parameter(1)
+-  v288 = f32[8,256]{1,0} parameter(2)
+-  v289 = f32[] constant(0.00390625)
+-  v290 = f32[8,256]{1,0} broadcast(v289), dimensions={}
+-  v291 = f32[8,256]{1,0} multiply(v288, v290)
+-  v292 = f32[8,256,256]{2,1,0} broadcast(v291), dimensions={0,1}
+-  v293 = f32[8,256,256]{2,1,0} subtract(v287, v292)
+-  v294 = f32[8,256]{1,0} parameter(0)
+-  v295 = f32[8,256,256]{2,1,0} broadcast(v294), dimensions={0,1}
+-  v296 = f32[8,256,256]{2,1,0} multiply(v293, v295)
+-  ROOT v297 = f32[2048,256]{1,0} bitcast(v296)
+-}
+-
+-v469 (v298: f32[8,256]) -> f32[8,256] {
+-  v298 = f32[8,256]{1,0} parameter(0)
++  ROOT v257 = f32[8,256,256]{2,1,0} add(v255, v256)
++}
++
++v460 (v258: f32[2048,256]) -> f32[2048,256] {
++  v258 = f32[2048,256]{1,0} parameter(0)
++  v259 = f32[8,256,256]{2,1,0} bitcast(v258)
++  v260 = f32[8,256,256]{2,1,0} multiply(v259, v259)
++  v261 = f32[8,256,256]{2,1,0} multiply(v260, v259)
++  v262 = f32[] constant(0.044715)
++  v263 = f32[8,256,256]{2,1,0} broadcast(v262), dimensions={}
++  v264 = f32[8,256,256]{2,1,0} multiply(v261, v263)
++  v265 = f32[8,256,256]{2,1,0} add(v259, v264)
++  v266 = f32[] constant(0.797884583)
++  v267 = f32[8,256,256]{2,1,0} broadcast(v266), dimensions={}
++  v268 = f32[8,256,256]{2,1,0} multiply(v265, v267)
++  v269 = f32[8,256,256]{2,1,0} tanh(v268)
++  v270 = f32[] constant(1)
++  v271 = f32[8,256,256]{2,1,0} broadcast(v270), dimensions={}
++  v272 = f32[8,256,256]{2,1,0} add(v269, v271)
++  v273 = f32[] constant(0.5)
++  v274 = f32[8,256,256]{2,1,0} broadcast(v273), dimensions={}
++  v275 = f32[8,256,256]{2,1,0} multiply(v272, v274)
++  v276 = f32[8,256,256]{2,1,0} multiply(v259, v275)
++  ROOT v277 = f32[2048,256]{1,0} bitcast(v276)
++}
++
++v461 (v285: f32[8,256], v278: f32[8,256,256], v279: f32[8,256]) -> f32[2048,256] {
++  v278 = f32[8,256,256]{2,1,0} parameter(1)
++  v279 = f32[8,256]{1,0} parameter(2)
++  v280 = f32[] constant(0.00390625)
++  v281 = f32[8,256]{1,0} broadcast(v280), dimensions={}
++  v282 = f32[8,256]{1,0} multiply(v279, v281)
++  v283 = f32[8,256,256]{2,1,0} broadcast(v282), dimensions={0,1}
++  v284 = f32[8,256,256]{2,1,0} subtract(v278, v283)
++  v285 = f32[8,256]{1,0} parameter(0)
++  v286 = f32[8,256,256]{2,1,0} broadcast(v285), dimensions={0,1}
++  v287 = f32[8,256,256]{2,1,0} multiply(v284, v286)
++  ROOT v288 = f32[2048,256]{1,0} bitcast(v287)
++}
++
++v462 (v289: f32[8,256]) -> f32[8,256] {
++  v289 = f32[8,256]{1,0} parameter(0)
++  v290 = f32[] constant(0.00390625)
++  v291 = f32[8,256]{1,0} broadcast(v290), dimensions={}
++  v292 = f32[8,256]{1,0} multiply(v289, v291)
++  v293 = f32[] constant(1e-05)
++  v294 = f32[8,256]{1,0} broadcast(v293), dimensions={}
++  v295 = f32[8,256]{1,0} add(v292, v294)
++  ROOT v296 = f32[8,256]{1,0} rsqrt(v295)
++}
++
++v463 (v297: f32[8,256,256], v298: f32[8,256]) -> f32[8,256,256] {
++  v297 = f32[8,256,256]{2,1,0} parameter(0)
++  v298 = f32[8,256]{1,0} parameter(1)
+   v299 = f32[] constant(0.00390625)
+   v300 = f32[8,256]{1,0} broadcast(v299), dimensions={}
+   v301 = f32[8,256]{1,0} multiply(v298, v300)
+-  v302 = f32[] constant(1e-05)
+-  v303 = f32[8,256]{1,0} broadcast(v302), dimensions={}
+-  v304 = f32[8,256]{1,0} add(v301, v303)
+-  ROOT v305 = f32[8,256]{1,0} rsqrt(v304)
+-}
+-
+-v470 (v306: f32[8,256,256], v307: f32[8,256]) -> f32[8,256,256] {
+-  v306 = f32[8,256,256]{2,1,0} parameter(0)
+-  v307 = f32[8,256]{1,0} parameter(1)
+-  v308 = f32[] constant(0.00390625)
++  v302 = f32[8,256,256]{2,1,0} broadcast(v301), dimensions={0,1}
++  ROOT v303 = f32[8,256,256]{2,1,0} subtract(v297, v302)
++}
++
++v464 (v304: f32[8,256,256], v305: f32[8,256]) -> f32[8,256,256] {
++  v304 = f32[8,256,256]{2,1,0} parameter(0)
++  v305 = f32[8,256]{1,0} parameter(1)
++  v306 = f32[8,256,256]{2,1,0} broadcast(v305), dimensions={0,1}
++  ROOT v307 = f32[8,256,256]{2,1,0} multiply(v304, v306)
++}
++
++v465 (v310: f32[8,256]) -> f32[8,256] {
++  v308 = f32[] constant(1)
+   v309 = f32[8,256]{1,0} broadcast(v308), dimensions={}
+-  v310 = f32[8,256]{1,0} multiply(v307, v309)
+-  v311 = f32[8,256,256]{2,1,0} broadcast(v310), dimensions={0,1}
+-  ROOT v312 = f32[8,256,256]{2,1,0} subtract(v306, v311)
+-}
+-
+-v471 (v313: f32[8,256,256], v314: f32[8,256]) -> f32[8,256,256] {
+-  v313 = f32[8,256,256]{2,1,0} parameter(0)
+-  v314 = f32[8,256]{1,0} parameter(1)
+-  v315 = f32[8,256,256]{2,1,0} broadcast(v314), dimensions={0,1}
+-  ROOT v316 = f32[8,256,256]{2,1,0} multiply(v313, v315)
+-}
+-
+-v472 (v319: f32[8,256]) -> f32[8,256] {
+-  v317 = f32[] constant(1)
+-  v318 = f32[8,256]{1,0} broadcast(v317), dimensions={}
++  v310 = f32[8,256]{1,0} parameter(0)
++  ROOT v311 = f32[8,256]{1,0} divide(v309, v310)
++}
++
++v466 (v319: f32[8,256], v312: f32[8,256,256], v313: f32[8,256]) -> f32[2048,256] {
++  v312 = f32[8,256,256]{2,1,0} parameter(1)
++  v313 = f32[8,256]{1,0} parameter(2)
++  v314 = f32[] constant(0.00390625)
++  v315 = f32[8,256]{1,0} broadcast(v314), dimensions={}
++  v316 = f32[8,256]{1,0} multiply(v313, v315)
++  v317 = f32[8,256,256]{2,1,0} broadcast(v316), dimensions={0,1}
++  v318 = f32[8,256,256]{2,1,0} subtract(v312, v317)
+   v319 = f32[8,256]{1,0} parameter(0)
+-  ROOT v320 = f32[8,256]{1,0} divide(v318, v319)
+-}
+-
+-v473 (v328: f32[8,256], v321: f32[8,256,256], v322: f32[8,256]) -> f32[2048,256] {
+-  v321 = f32[8,256,256]{2,1,0} parameter(1)
+-  v322 = f32[8,256]{1,0} parameter(2)
+-  v323 = f32[] constant(0.00390625)
+-  v324 = f32[8,256]{1,0} broadcast(v323), dimensions={}
+-  v325 = f32[8,256]{1,0} multiply(v322, v324)
+-  v326 = f32[8,256,256]{2,1,0} broadcast(v325), dimensions={0,1}
+-  v327 = f32[8,256,256]{2,1,0} subtract(v321, v326)
+-  v328 = f32[8,256]{1,0} parameter(0)
+-  v329 = f32[8,256,256]{2,1,0} broadcast(v328), dimensions={0,1}
+-  v330 = f32[8,256,256]{2,1,0} multiply(v327, v329)
+-  ROOT v331 = f32[2048,256]{1,0} bitcast(v330)
+-}
+-
+-v474 (v332: f32[8,256]) -> f32[8,256] {
+-  v332 = f32[8,256]{1,0} parameter(0)
++  v320 = f32[8,256,256]{2,1,0} broadcast(v319), dimensions={0,1}
++  v321 = f32[8,256,256]{2,1,0} multiply(v318, v320)
++  ROOT v322 = f32[2048,256]{1,0} bitcast(v321)
++}
++
++v467 (v323: f32[8,256]) -> f32[8,256] {
++  v323 = f32[8,256]{1,0} parameter(0)
++  v324 = f32[] constant(0.00390625)
++  v325 = f32[8,256]{1,0} broadcast(v324), dimensions={}
++  v326 = f32[8,256]{1,0} multiply(v323, v325)
++  v327 = f32[] constant(1e-05)
++  v328 = f32[8,256]{1,0} broadcast(v327), dimensions={}
++  v329 = f32[8,256]{1,0} add(v326, v328)
++  ROOT v330 = f32[8,256]{1,0} rsqrt(v329)
++}
++
++v468 (v331: f32[8,256,256], v332: f32[8,256]) -> f32[8,256,256] {
++  v331 = f32[8,256,256]{2,1,0} parameter(0)
++  v332 = f32[8,256]{1,0} parameter(1)
+   v333 = f32[] constant(0.00390625)
+   v334 = f32[8,256]{1,0} broadcast(v333), dimensions={}
+   v335 = f32[8,256]{1,0} multiply(v332, v334)
+-  v336 = f32[] constant(1e-05)
+-  v337 = f32[8,256]{1,0} broadcast(v336), dimensions={}
+-  v338 = f32[8,256]{1,0} add(v335, v337)
+-  ROOT v339 = f32[8,256]{1,0} rsqrt(v338)
+-}
+-
+-v475 (v340: f32[8,256,256], v341: f32[8,256]) -> f32[8,256,256] {
++  v336 = f32[8,256,256]{2,1,0} broadcast(v335), dimensions={0,1}
++  ROOT v337 = f32[8,256,256]{2,1,0} subtract(v331, v336)
++}
++
++v469 (v338: f32[]) -> f32[8,256,256] {
++  v338 = f32[] parameter(0)
++  ROOT v339 = f32[8,256,256]{2,1,0} broadcast(v338), dimensions={}
++}
++
++v470 (v340: f32[8,256,256], v341: f32[8,256,256]) -> f32[8,256,256] {
+   v340 = f32[8,256,256]{2,1,0} parameter(0)
+-  v341 = f32[8,256]{1,0} parameter(1)
+-  v342 = f32[] constant(0.00390625)
+-  v343 = f32[8,256]{1,0} broadcast(v342), dimensions={}
+-  v344 = f32[8,256]{1,0} multiply(v341, v343)
+-  v345 = f32[8,256,256]{2,1,0} broadcast(v344), dimensions={0,1}
+-  ROOT v346 = f32[8,256,256]{2,1,0} subtract(v340, v345)
+-}
+-
+-v476 (v347: f32[]) -> f32[8,256,256] {
+-  v347 = f32[] parameter(0)
+-  ROOT v348 = f32[8,256,256]{2,1,0} broadcast(v347), dimensions={}
+-}
+-
+-v477 (v349: f32[8,256,256], v350: f32[8,256,256]) -> f32[8,256,256] {
+-  v349 = f32[8,256,256]{2,1,0} parameter(0)
+-  v350 = f32[8,256,256]{2,1,0} parameter(1)
+-  ROOT v351 = f32[8,256,256]{2,1,0} add(v349, v350)
+-}
+-
+-ENTRY v478 (v352: f32[8,256,256]) -> f32[8,256,256] {
+-  v352 = f32[8,256,256]{2,1,0} parameter(0)
+-  v353 = f32[] constant(0.5)
+-  v354 = f32[] constant(-inf)
+-  v355 = f32[] constant(0)
++  v341 = f32[8,256,256]{2,1,0} parameter(1)
++  ROOT v342 = f32[8,256,256]{2,1,0} add(v340, v341)
++}
++
++v471 (v343: f32[8,256,256], v344: f32[8,256,256]) -> f32[8,256,256] {
++  v343 = f32[8,256,256]{2,1,0} parameter(0)
++  v344 = f32[8,256,256]{2,1,0} parameter(1)
++  ROOT v345 = f32[8,256,256]{2,1,0} add(v343, v344)
++}
++
++ENTRY v472 (v346: f32[8,256,256]) -> f32[8,256,256] {
++  v346 = f32[8,256,256]{2,1,0} parameter(0)
++  v347 = f32[] constant(0.5)
++  v348 = f32[] constant(-inf)
++  v349 = f32[] constant(0)
++  v350 = f32[256,256]{1,0} constant({...})
++  v351 = f32[256,256]{1,0} constant({...})
++  v352 = f32[256,256]{1,0} constant({...})
++  v353 = f32[256,256]{1,0} constant({...})
++  v354 = f32[256,256]{1,0} constant({...})
++  v355 = f32[256,256]{1,0} constant({...})
+   v356 = f32[256,256]{1,0} constant({...})
+-  v357 = f32[256,256]{1,0} constant({...})
+-  v358 = f32[256,256]{1,0} constant({...})
+-  v359 = f32[256,256]{1,0} constant({...})
+-  v360 = f32[256,256]{1,0} constant({...})
+-  v361 = f32[256,256]{1,0} constant({...})
+-  v362 = f32[256,256]{1,0} constant({...})
+-  v363 = f32[8,256,256]{2,1,0} fusion(v353), kind=kLoop, calls=v476, backend_config={"outer_dimension_partitions":["4"]}
+-  v364 = f32[8,256]{1,0} fusion(v352, v355), kind=kCustom, calls=v451, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v365 = f32[8,256,256]{2,1,0} fusion(v352, v364), kind=kLoop, calls=v475, backend_config={"outer_dimension_partitions":["4"]}
+-  v366 = f32[8,256]{1,0} fusion(v355, v365), kind=kCustom, calls=v449, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v367 = f32[8,256]{1,0} fusion(v366), kind=kLoop, calls=v474
+-  v368 = f32[2048,256]{1,0} fusion(v367, v352, v364), kind=kLoop, calls=v473, backend_config={"outer_dimension_partitions":["4"]}
+-  v369 = f32[8,256,256]{2,1,0} fusion(v354, v363, v368), kind=kCustom, calls=v447, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v370 = f32[2048,256]{1,0} fusion(v368, v356), kind=kCustom, calls=v443, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v371 = f32[8,256]{1,0} fusion(v369, v355), kind=kCustom, calls=v445, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v372 = f32[8,256,256]{2,1,0} bitcast(v370)
+-  v373 = f32[8,256]{1,0} fusion(v371), kind=kLoop, calls=v472
+-  v374 = f32[8,256,256]{2,1,0} fusion(v369, v373), kind=kLoop, calls=v471, backend_config={"outer_dimension_partitions":["4"]}
+-  v375 = f32[8,256,256]{2,1,0} fusion(v374, v372), kind=kCustom, calls=v442, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v376 = f32[8,256,256]{2,1,0} fusion(v375, v352), kind=kLoop, calls=v477, backend_config={"outer_dimension_partitions":["4"]}
+-  v377 = f32[8,256]{1,0} fusion(v376, v355), kind=kCustom, calls=v441, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v378 = f32[8,256,256]{2,1,0} fusion(v376, v377), kind=kLoop, calls=v470, backend_config={"outer_dimension_partitions":["4"]}
+-  v379 = f32[8,256]{1,0} fusion(v355, v378), kind=kCustom, calls=v439, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v380 = f32[8,256]{1,0} fusion(v379), kind=kLoop, calls=v469
+-  v381 = f32[2048,256]{1,0} fusion(v380, v376, v377), kind=kLoop, calls=v468, backend_config={"outer_dimension_partitions":["4"]}
+-  v382 = f32[2048,256]{1,0} fusion(v381, v357), kind=kCustom, calls=v437, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v383 = f32[2048,256]{1,0} fusion(v382), kind=kLoop, calls=v467, backend_config={"outer_dimension_partitions":["4"]}
+-  v384 = f32[2048,256]{1,0} fusion(v383, v358), kind=kCustom, calls=v436, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v385 = f32[8,256,256]{2,1,0} fusion(v376, v384), kind=kLoop, calls=v466, backend_config={"outer_dimension_partitions":["4"]}
+-  v386 = f32[8,256]{1,0} fusion(v385, v355), kind=kCustom, calls=v435, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v387 = f32[8,256,256]{2,1,0} fusion(v385, v386), kind=kLoop, calls=v465, backend_config={"outer_dimension_partitions":["4"]}
+-  v388 = f32[8,256]{1,0} fusion(v355, v387), kind=kCustom, calls=v433, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v389 = f32[8,256]{1,0} fusion(v388), kind=kLoop, calls=v464
+-  v390 = f32[2048,256]{1,0} fusion(v389, v385, v386), kind=kLoop, calls=v463, backend_config={"outer_dimension_partitions":["4"]}
+-  v391 = f32[8,256,256]{2,1,0} fusion(v354, v390), kind=kCustom, calls=v431, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v392 = f32[2048,256]{1,0} fusion(v390, v359), kind=kCustom, calls=v427, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v393 = f32[8,256]{1,0} fusion(v391, v355), kind=kCustom, calls=v429, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v394 = f32[8,256,256]{2,1,0} bitcast(v392)
+-  v395 = f32[8,256]{1,0} fusion(v393), kind=kLoop, calls=v462
+-  v396 = f32[8,256,256]{2,1,0} fusion(v391, v395), kind=kLoop, calls=v461, backend_config={"outer_dimension_partitions":["4"]}
+-  v397 = f32[8,256,256]{2,1,0} fusion(v396, v394), kind=kCustom, calls=v426, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v398 = f32[8,256,256]{2,1,0} fusion(v385, v397), kind=kLoop, calls=v460, backend_config={"outer_dimension_partitions":["4"]}
+-  v399 = f32[8,256]{1,0} fusion(v398, v355), kind=kCustom, calls=v425, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v400 = f32[8,256,256]{2,1,0} fusion(v398, v399), kind=kLoop, calls=v459, backend_config={"outer_dimension_partitions":["4"]}
+-  v401 = f32[8,256]{1,0} fusion(v355, v400), kind=kCustom, calls=v423, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v402 = f32[8,256]{1,0} fusion(v401), kind=kLoop, calls=v458
+-  v403 = f32[2048,256]{1,0} fusion(v402, v398, v399), kind=kLoop, calls=v457, backend_config={"outer_dimension_partitions":["4"]}
+-  v404 = f32[2048,256]{1,0} fusion(v403, v360), kind=kCustom, calls=v421, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v405 = f32[2048,256]{1,0} fusion(v404), kind=kLoop, calls=v456, backend_config={"outer_dimension_partitions":["4"]}
+-  v406 = f32[2048,256]{1,0} fusion(v405, v361), kind=kCustom, calls=v420, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v407 = f32[8,256,256]{2,1,0} fusion(v398, v406), kind=kLoop, calls=v455, backend_config={"outer_dimension_partitions":["4"]}
+-  v408 = f32[8,256]{1,0} fusion(v407, v355), kind=kCustom, calls=v419, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v409 = f32[8,256,256]{2,1,0} fusion(v407, v408), kind=kLoop, calls=v454, backend_config={"outer_dimension_partitions":["4"]}
+-  v410 = f32[8,256]{1,0} fusion(v355, v409), kind=kCustom, calls=v417, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  v411 = f32[8,256]{1,0} fusion(v410), kind=kLoop, calls=v453
+-  v412 = f32[2048,256]{1,0} fusion(v411, v407, v408), kind=kLoop, calls=v452, backend_config={"outer_dimension_partitions":["4"]}
+-  v413 = f32[2048,256]{1,0} fusion(v412, v362), kind=kCustom, calls=v415, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
+-  ROOT v414 = f32[8,256,256]{2,1,0} bitcast(v413)
+-}
+-
++  v357 = f32[8,256,256]{2,1,0} fusion(v347), kind=kLoop, calls=v469, backend_config={"outer_dimension_partitions":["4"]}
++  v358 = f32[8,256]{1,0} fusion(v346, v349), kind=kCustom, calls=v445, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v359 = f32[8,256,256]{2,1,0} fusion(v346, v358), kind=kLoop, calls=v468, backend_config={"outer_dimension_partitions":["4"]}
++  v360 = f32[8,256]{1,0} fusion(v349, v359), kind=kCustom, calls=v443, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v361 = f32[8,256]{1,0} fusion(v360), kind=kLoop, calls=v467
++  v362 = f32[2048,256]{1,0} fusion(v361, v346, v358), kind=kLoop, calls=v466, backend_config={"outer_dimension_partitions":["4"]}
++  v363 = f32[8,256,256]{2,1,0} fusion(v348, v357, v362), kind=kCustom, calls=v441, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v364 = f32[2048,256]{1,0} fusion(v362, v350), kind=kCustom, calls=v437, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v365 = f32[8,256]{1,0} fusion(v363, v349), kind=kCustom, calls=v439, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v366 = f32[8,256,256]{2,1,0} bitcast(v364)
++  v367 = f32[8,256]{1,0} fusion(v365), kind=kLoop, calls=v465
++  v368 = f32[8,256,256]{2,1,0} fusion(v363, v367), kind=kLoop, calls=v464, backend_config={"outer_dimension_partitions":["4"]}
++  v369 = f32[8,256,256]{2,1,0} fusion(v368, v366), kind=kCustom, calls=v436, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v370 = f32[8,256,256]{2,1,0} fusion(v369, v346), kind=kLoop, calls=v470, backend_config={"outer_dimension_partitions":["4"]}
++  v371 = f32[8,256]{1,0} fusion(v370, v349), kind=kCustom, calls=v435, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v372 = f32[8,256,256]{2,1,0} fusion(v370, v371), kind=kLoop, calls=v463, backend_config={"outer_dimension_partitions":["4"]}
++  v373 = f32[8,256]{1,0} fusion(v349, v372), kind=kCustom, calls=v433, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v374 = f32[8,256]{1,0} fusion(v373), kind=kLoop, calls=v462
++  v375 = f32[2048,256]{1,0} fusion(v374, v370, v371), kind=kLoop, calls=v461, backend_config={"outer_dimension_partitions":["4"]}
++  v376 = f32[2048,256]{1,0} fusion(v375, v351), kind=kCustom, calls=v431, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v377 = f32[2048,256]{1,0} fusion(v376), kind=kLoop, calls=v460, backend_config={"outer_dimension_partitions":["4"]}
++  v378 = f32[2048,256]{1,0} fusion(v377, v352), kind=kCustom, calls=v430, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v379 = f32[8,256,256]{2,1,0} fusion(v370, v378), kind=kLoop, calls=v459, backend_config={"outer_dimension_partitions":["4"]}
++  v380 = f32[8,256]{1,0} fusion(v379, v349), kind=kCustom, calls=v429, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v381 = f32[8,256,256]{2,1,0} fusion(v379, v380), kind=kLoop, calls=v458, backend_config={"outer_dimension_partitions":["4"]}
++  v382 = f32[8,256]{1,0} fusion(v349, v381), kind=kCustom, calls=v427, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v383 = f32[8,256]{1,0} fusion(v382), kind=kLoop, calls=v457
++  v384 = f32[2048,256]{1,0} fusion(v383, v379, v380), kind=kLoop, calls=v456, backend_config={"outer_dimension_partitions":["4"]}
++  v385 = f32[8,256,256]{2,1,0} fusion(v348, v384), kind=kCustom, calls=v425, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v386 = f32[2048,256]{1,0} fusion(v384, v353), kind=kCustom, calls=v421, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v387 = f32[8,256]{1,0} fusion(v385, v349), kind=kCustom, calls=v423, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v388 = f32[8,256,256]{2,1,0} bitcast(v386)
++  v389 = f32[8,256]{1,0} fusion(v387), kind=kLoop, calls=v455
++  v390 = f32[8,256,256]{2,1,0} fusion(v385, v389), kind=kLoop, calls=v454, backend_config={"outer_dimension_partitions":["4"]}
++  v391 = f32[8,256,256]{2,1,0} fusion(v390, v388), kind=kCustom, calls=v420, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v392 = f32[8,256,256]{2,1,0} fusion(v391, v379), kind=kLoop, calls=v471, backend_config={"outer_dimension_partitions":["4"]}
++  v393 = f32[8,256]{1,0} fusion(v392, v349), kind=kCustom, calls=v419, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v394 = f32[8,256,256]{2,1,0} fusion(v392, v393), kind=kLoop, calls=v453, backend_config={"outer_dimension_partitions":["4"]}
++  v395 = f32[8,256]{1,0} fusion(v349, v394), kind=kCustom, calls=v417, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v396 = f32[8,256]{1,0} fusion(v395), kind=kLoop, calls=v452
++  v397 = f32[2048,256]{1,0} fusion(v396, v392, v393), kind=kLoop, calls=v451, backend_config={"outer_dimension_partitions":["4"]}
++  v398 = f32[2048,256]{1,0} fusion(v397, v354), kind=kCustom, calls=v415, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v399 = f32[2048,256]{1,0} fusion(v398), kind=kLoop, calls=v450, backend_config={"outer_dimension_partitions":["4"]}
++  v400 = f32[2048,256]{1,0} fusion(v399, v355), kind=kCustom, calls=v414, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v401 = f32[8,256,256]{2,1,0} fusion(v392, v400), kind=kLoop, calls=v449, backend_config={"outer_dimension_partitions":["4"]}
++  v402 = f32[8,256]{1,0} fusion(v401, v349), kind=kCustom, calls=v413, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v403 = f32[8,256,256]{2,1,0} fusion(v401, v402), kind=kLoop, calls=v448, backend_config={"outer_dimension_partitions":["4"]}
++  v404 = f32[8,256]{1,0} fusion(v349, v403), kind=kCustom, calls=v411, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  v405 = f32[8,256]{1,0} fusion(v404), kind=kLoop, calls=v447
++  v406 = f32[2048,256]{1,0} fusion(v405, v401, v402), kind=kLoop, calls=v446, backend_config={"outer_dimension_partitions":["4"]}
++  v407 = f32[2048,256]{1,0} fusion(v406, v356), kind=kCustom, calls=v409, backend_config={"fusion_config":{"kind":"__ynn_fusion"},"outer_dimension_partitions":[]}
++  ROOT v408 = f32[8,256,256]{2,1,0} bitcast(v407)
++}
++

@@ -25,6 +25,7 @@ from models.tiny_lm import WEIGHTS_PATH, make_torch_model  # noqa: E402
 from pipeline import run_pipeline  # noqa: E402
 from utils.executor import compare_latency, execute  # noqa: E402
 from utils.metrics import compute_metrics  # noqa: E402
+from utils.environment import collect as environment  # noqa: E402
 
 
 def tiny_lm(seq):
@@ -153,6 +154,7 @@ def main():
     except Exception as exc:  # transformers missing
         unsupported = [{"error": str(exc)}]
     out.write_text(json.dumps({"rows": rows, "torch": torch.__version__,
+                               "environment": environment(),
                                "other_architectures": unsupported}, indent=1, default=float))
     print("wrote", out)
 

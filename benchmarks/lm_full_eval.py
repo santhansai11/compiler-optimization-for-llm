@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from models.tiny_lm import WEIGHTS_PATH, build_graph, make_torch_model  # noqa: E402
 from pipeline import run_pipeline  # noqa: E402
 from utils.executor import execute  # noqa: E402
+from utils.environment import collect as environment  # noqa: E402
 
 SEQ, BATCH = 64, 32
 
@@ -66,6 +67,7 @@ def main():
     res["max_logit_diff_vs_pytorch"] = max_diff
     res["compiled_same_top1_as_pytorch_pct"] = 100.0 * agree / total
     res["graph_nodes"] = [g.node_count(), opt.node_count()]
+    res["environment"] = environment()
     (ROOT / "docs" / "results" / "lm_full_eval.json").write_text(json.dumps(res, indent=1))
     print(json.dumps(res, indent=1))
 

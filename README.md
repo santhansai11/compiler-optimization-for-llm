@@ -9,10 +9,10 @@ A compiler-style optimizer for LLM computation graphs, inspired by XLA/OpenXLA. 
 ```bash
 ./run.sh            # macOS/Linux: API on :8000, GUI on http://127.0.0.1:5173
 run-server.bat      # Windows (create .venv and install requirements.txt first)
-python -m unittest discover -s tests -t .      # 17 correctness tests
+python -m unittest discover -s tests -t .      # 26 tests
 ```
 
-Python 3.12 + Node.js. `pip install -r requirements.txt` (torch, jax, networkx, openpyxl, matplotlib); `pip install -r requirements-real.txt` adds HuggingFace `transformers` for the real-graph study.
+Python 3.12 + Node.js. `pip install -r requirements.txt` (torch, jax, scipy, networkx, openpyxl, matplotlib); `pip install -r requirements-real.txt` adds HuggingFace `transformers` for the real-graph study.
 
 ## What it does
 
@@ -138,6 +138,21 @@ Effect of our passes **on top of** each compiler: XLA ×1.000, TorchInductor ×1
 | cheap devices | 50 | 0.05 | 1.24 | **1.48** | 1.51 | 1.8% | 56% |
 | expensive devices | 50 | 0.3 | 1.24 | **1.28** | 1.35 | 4.3% | 25% |
 
+### 8. Rewrite guidance trained and evaluated on XLA (`benchmarks/xla_rewrite_study.py`)
+
+Labels and evaluation use the same target: every graph is compiled with `jax.jit` (XLA, CPU) and timed. 36 workloads (6 architectures × 3 sizes × base / injected redundancy); the latency GNN is trained leave-one-architecture-out on 3699 XLA-timed graphs. Each policy is timed in 30 paired rounds with the variant order shuffled every round. Environment: Apple M3 Pro, 12 cores, Darwin 27.0.0, jax 0.12.0.1, jaxlib 0.12.0.1.
+
+Pair model on held-out architectures: graph latency MAE 938.8 µs (20.8%), pair-speedup MAE 0.039, pair rank correlation 0.00 (-0.01 for pairs predicted within ±5% of 1).
+
+| Policy (vs no rewriting) | Suite median speedup [95% CI] | Faster | Slower | Indistinguishable | Same optimised HLO as original |
+|---|---|---|---|---|---|
+| All-safe | 1.002× [1.001, 1.004] | 13 | 0 | 23 | 18 |
+| Guided | 1.001× [0.999, 1.003] | 9 | 2 | 25 | 11 |
+| Random, same count | 1.002× [1.000, 1.003] | 7 | 2 | 27 | 10 |
+| Fixed rule (no CSE) | 1.002× [1.001, 1.005] | 12 | 0 | 24 | 18 |
+
+Guided vs all-safe: median ratio 0.9987 [0.9981, 0.9998], Wilcoxon p = 0.008; guided faster on 0, slower on 7, indistinguishable on 29 workloads; identical optimised HLO on 9. Guided search scored 3993 candidates, 0 without a usable estimate. All tables, the accept/reject confusion, per-rule HLO effects and the raw samples: `docs/results/xla_rewrite_study_tables.md`, `docs/results/xla_rewrite_study_samples.csv`, `docs/results/xla_rewrite_study_hlo/`.
+
 ## Honest limitations
 
 * **No NVIDIA GPU measured.** Real-GPU numbers are one Apple M3 Pro (Metal/MPS); `benchmarks/colab_gpu_benchmark.ipynb` is untested.
@@ -162,6 +177,7 @@ python -m search.rl_policy train             # §5
 python benchmarks/neuro_symbolic_study.py    # §5   (needs a GPU for timings)
 python benchmarks/compiler_comparison.py     # §6
 python benchmarks/unseen_architecture_test.py && python benchmarks/learned_sensitivity.py
+python benchmarks/xla_rewrite_study.py && python tools/make_xla_tables.py   # §8 (CPU)
 python tools/make_diagrams.py && python tools/make_readme.py
 # or everything, one job at a time:  tools/rerun_all.sh
 ```

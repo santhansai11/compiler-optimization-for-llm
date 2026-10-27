@@ -31,6 +31,7 @@ def legacy_us(graph, scheduled=False):
     """Original hand-written table (+12us launch per node), single stream."""
     return sum(LEGACY_OP_LATENCY_US.get(d["op_type"], 150.0) + 12.0
                for _, d in graph.graph.nodes(data=True))
+from utils import environment  # noqa: E402
 from utils.gpu_calibration import fit, predict_rows, profile_nodes  # noqa: E402
 from utils.torch_executor import device_name, gpu_compare, pick_device  # noqa: E402
 
@@ -129,6 +130,7 @@ def main():
     out = {
         "device": device.type, "device_name": device_name(device),
         "torch": torch.__version__, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "environment": environment.collect(),
         "sizes": SIZES, "train_architectures": TRAIN_ARCHS,
         "validation_held_out_architectures": validation,
         "in_sample_train_architectures": in_sample,
