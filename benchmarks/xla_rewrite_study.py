@@ -26,6 +26,7 @@
     python benchmarks/xla_rewrite_study.py                  # full run
     python benchmarks/xla_rewrite_study.py --quick          # smoke test
     python benchmarks/xla_rewrite_study.py --single-thread  # 1 XLA thread
+    python benchmarks/xla_rewrite_study.py --config configs/xla_rewrite_study.json
 """
 
 import argparse
@@ -362,12 +363,16 @@ def rule_hlo_report(transitions, programs, hlo_dir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--config", help="JSON file overriding the full configuration (see configs/)")
     ap.add_argument("--single-thread", action="store_true")
     ap.add_argument("--rounds", type=int)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default=str(OUT))
     args = ap.parse_args()
     cfg = dict(QUICK if args.quick else FULL)
+    if args.config:
+        cfg.update({k: v for k, v in json.loads(Path(args.config).read_text()).items() if not k.startswith("_")})
+        cfg["sizes"] = [tuple(s) for s in cfg["sizes"]]
     if args.rounds:
         cfg["rounds"] = args.rounds
     rng = np.random.default_rng(args.seed)

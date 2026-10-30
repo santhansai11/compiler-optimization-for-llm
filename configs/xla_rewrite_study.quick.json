@@ -1,0 +1,10 @@
+{
+  "_comment": "Smoke-test configuration (about 30 s). Run: python benchmarks/xla_rewrite_study.py --config configs/xla_rewrite_study.quick.json --out results/quick.json",
+  "sizes": [[2, 32, 32]],
+  "trajectories": 1,
+  "max_len": 3,
+  "candidates": 2,
+  "label_rounds": 3,
+  "rounds": 5,
+  "epochs": 40
+}

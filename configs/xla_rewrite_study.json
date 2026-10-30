@@ -1,0 +1,10 @@
+{
+  "_comment": "Full configuration used for the paper. Run: python benchmarks/xla_rewrite_study.py --config configs/xla_rewrite_study.json",
+  "sizes": [[4, 64, 64], [4, 128, 128], [8, 256, 256]],
+  "trajectories": 2,
+  "max_len": 10,
+  "candidates": 6,
+  "label_rounds": 9,
+  "rounds": 30,
+  "epochs": 400
+}
